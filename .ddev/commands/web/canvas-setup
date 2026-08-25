@@ -1,0 +1,267 @@
+#!/usr/bin/env php
+<?php
+## Description: Interactive setup for the Drupal Canvas site connection (.env).
+## Usage: canvas-setup
+## Example: "ddev canvas-setup"
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function bold(string $text): string { return "\033[1m{$text}\033[0m"; }
+function green(string $text): string { return "\033[32m{$text}\033[0m"; }
+function yellow(string $text): string { return "\033[33m{$text}\033[0m"; }
+function red(string $text): string { return "\033[31m{$text}\033[0m"; }
+function dim(string $text): string { return "\033[2m{$text}\033[0m"; }
+
+function writeln(string $text = ''): void { fwrite(STDOUT, $text . "\n"); }
+
+// Read a line from the controlling terminal. DDEV custom commands (and the
+// install hook that wraps this one) do not reliably wire STDIN through as an
+// interactive stream, so fgets(STDIN) can return EOF immediately and prompts
+// appear to skip. /dev/tty is the real terminal (the same handle the installer
+// reads its own prompts from); fall back to STDIN only if it can't be opened.
+function ttyIn() {
+    static $h = null;
+    if ($h === null) {
+        $h = @fopen('/dev/tty', 'r');
+        if ($h === false) { $h = STDIN; }
+    }
+    return $h;
+}
+
+function readTtyLine(): string {
+    $line = fgets(ttyIn());
+    return $line === false ? '' : $line;
+}
+
+function prompt(string $question, string $default = ''): string {
+    $hint = $default !== '' ? ' ' . dim("[{$default}]") : '';
+    fwrite(STDOUT, bold($question) . $hint . ': ');
+    $answer = trim(readTtyLine());
+    return $answer !== '' ? $answer : $default;
+}
+
+function secret(string $question): string {
+    fwrite(STDOUT, bold($question) . ': ');
+    system('stty -echo </dev/tty 2>/dev/null');
+    $answer = trim(readTtyLine());
+    system('stty echo </dev/tty 2>/dev/null');
+    writeln(); // newline after hidden input
+    return $answer;
+}
+
+function confirm(string $question, bool $default = true): bool {
+    $hint = $default ? 'Y/n' : 'y/N';
+    fwrite(STDOUT, bold($question) . " [{$hint}]: ");
+    $answer = strtolower(trim(readTtyLine()));
+    if ($answer === '') return $default;
+    return in_array($answer, ['y', 'yes'], true);
+}
+
+function waitForEnter(string $message = 'Press Enter to continue...'): void {
+    fwrite(STDOUT, dim($message));
+    readTtyLine();
+}
+
+function generateSecret(int $length = 32): string {
+    $chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    $secret = '';
+    for ($i = 0; $i < $length; $i++) {
+        $secret .= $chars[random_int(0, strlen($chars) - 1)];
+    }
+    return $secret;
+}
+
+function trimUrl(string $url): string {
+    return rtrim(trim($url), '/');
+}
+
+// ---------------------------------------------------------------------------
+// Main
+// ---------------------------------------------------------------------------
+
+writeln();
+writeln(bold('Drupal Canvas Setup'));
+writeln(bold('==================='));
+writeln();
+writeln('This connects your components to a ' . bold('Drupal Canvas') . ' site');
+writeln('(a hosted Acquia Source site, or any Drupal site with the ' . bold('canvas_oauth') . ' module).');
+writeln();
+
+// ── 1. Set up now, or add the data later? ────────────────────────────────────
+
+if (!confirm('Set up the Canvas site connection now?', true)) {
+    writeln();
+    writeln(yellow('Skipping — no connection configured.'));
+    writeln('Add your Canvas site data later by running ' . bold('ddev canvas-setup') . ' again,');
+    writeln('or by editing ' . bold('.env') . ' directly (see ' . bold('.env.example') . ').');
+    writeln();
+    exit(0);
+}
+writeln();
+
+// ── 2. Site URL ──────────────────────────────────────────────────────────────
+
+writeln(dim('For Acquia Source, use the CMS/API URL (it may differ from the public site URL).'));
+$siteUrl = trimUrl(prompt('Canvas site URL (e.g. https://<uuid>.cms.acquia.site)'));
+
+writeln();
+
+// ── 3. Client credentials ───────────────────────────────────────────────────
+
+$clientId = prompt('OAuth client machine name', 'cli');
+
+$clientSecret = secret('OAuth client secret (leave blank to auto-generate)');
+$secretGenerated = false;
+if ($clientSecret === '') {
+    $clientSecret = generateSecret();
+    $secretGenerated = true;
+}
+
+writeln(dim('Drupal\'s default JSON:API prefix is "jsonapi"; Acquia Source uses "api".'));
+$jsonapiPrefix = prompt('JSON:API prefix', 'jsonapi');
+
+writeln();
+
+// ── 4. Summary & Drupal instructions ─────────────────────────────────────────
+
+writeln(bold('Summary'));
+writeln(str_repeat('─', 40));
+writeln('  Canvas site URL:   ' . green($siteUrl));
+writeln('  Client ID:         ' . green($clientId));
+writeln('  Client secret:     ' . green($clientSecret) . ($secretGenerated ? dim(' (generated)') : ''));
+writeln('  JSON:API prefix:   ' . green($jsonapiPrefix));
+writeln();
+
+writeln(bold(yellow('Configure the OAuth client in Drupal')));
+writeln(str_repeat('─', 40));
+$clientsPath = '/admin/config/services/api-clients';
+$addLabel = 'Add API client';
+writeln('  1. Go to ' . bold('Configuration > Simple OAuth > Clients'));
+writeln('     ' . dim($siteUrl . $clientsPath));
+writeln('  2. Click ' . bold("\"{$addLabel}\"") . '.');
+writeln('  3. Choose a ' . bold('Label') . ' (e.g. "Canvas CLI").');
+writeln('  4. Set ' . bold('Client ID') . ' to: ' . bold($clientId));
+writeln('  5. Set ' . bold('New secret') . ' to: ' . bold($clientSecret));
+writeln('  6. Under ' . bold('Grant types') . ', enable ' . bold('"Client Credentials"') . '.');
+writeln('  7. Under ' . bold('Scopes') . ', select all available scopes.');
+writeln('  8. Set ' . bold('User') . ' to your admin account.');
+writeln('     ' . red('Without this, authentication will fail with a 401 error.'));
+writeln('  9. Uncheck ' . bold('"Is this API client 3rd party?"') . '.');
+writeln(' 10. Check ' . bold('"Is confidential?"') . '.');
+writeln(' 11. Save.');
+writeln();
+writeln(dim('Full guide: https://git.drupalcode.org/project/canvas/-/tree/1.x/modules/canvas_oauth#2-setup'));
+writeln();
+
+waitForEnter('Once the client is configured in Drupal, press Enter to continue...');
+writeln();
+
+// ── 5. Write .env ────────────────────────────────────────────────────────────
+
+$envPath = '/var/www/html/.env';
+
+$writeEnv = !file_exists($envPath) || confirm('An .env file already exists. Overwrite it?', false);
+
+if ($writeEnv) {
+    $envContent = <<<ENV
+##
+# Written by `ddev canvas-setup` — see .env.example for all options.
+##
+
+CANVAS_SITE_URL={$siteUrl}
+CANVAS_CLIENT_ID={$clientId}
+CANVAS_CLIENT_SECRET={$clientSecret}
+CANVAS_JSONAPI_PREFIX={$jsonapiPrefix}
+
+ENV;
+    file_put_contents($envPath, $envContent);
+    writeln(green('.env written successfully.'));
+
+    // Workbench reads CANVAS_SITE_URL at startup (it proxies the site's Canvas
+    // API), so restart the daemon to pick up the new connection.
+    writeln(dim('Restarting Canvas Workbench to pick up the connection...'));
+    system('supervisorctl restart webextradaemons:workbench >/dev/null 2>&1');
+} else {
+    writeln(yellow('Skipping .env write.'));
+}
+writeln();
+
+// ── 6. Validate connection (optional) ────────────────────────────────────────
+
+if (confirm('Test the connection now?')) {
+    writeln();
+    writeln(dim('Requesting OAuth token...'));
+
+    $tokenUrl = $siteUrl . '/oauth/token';
+    $ch = curl_init($tokenUrl);
+    curl_setopt_array($ch, [
+        CURLOPT_POST => true,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_TIMEOUT => 15,
+        CURLOPT_POSTFIELDS => http_build_query([
+            'grant_type' => 'client_credentials',
+            'client_id' => $clientId,
+            'client_secret' => $clientSecret,
+        ]),
+        CURLOPT_HTTPHEADER => ['Content-Type: application/x-www-form-urlencoded'],
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    $curlError = curl_error($ch);
+    curl_close($ch);
+
+    if ($curlError) {
+        writeln(red("Connection failed: {$curlError}"));
+        writeln(yellow('Check that the URL is correct and the site is reachable.'));
+    } elseif ($httpCode === 200) {
+        $data = json_decode($response, true);
+        if (isset($data['access_token'])) {
+            writeln(green('OAuth token obtained successfully.'));
+            writeln();
+
+            // Test the JSON:API endpoint.
+            writeln(dim('Testing JSON:API endpoint...'));
+            $apiUrl = $siteUrl . '/' . $jsonapiPrefix;
+            $ch2 = curl_init($apiUrl);
+            curl_setopt_array($ch2, [
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_HTTPHEADER => [
+                    'Authorization: Bearer ' . $data['access_token'],
+                    'Accept: application/vnd.api+json',
+                ],
+            ]);
+            $apiResponse = curl_exec($ch2);
+            $apiCode = curl_getinfo($ch2, CURLINFO_HTTP_CODE);
+            curl_close($ch2);
+
+            if ($apiCode >= 200 && $apiCode < 300) {
+                writeln(green('JSON:API endpoint is reachable.'));
+            } else {
+                writeln(yellow("JSON:API endpoint returned HTTP {$apiCode}."));
+                writeln(yellow('The OAuth connection works but the JSON:API prefix may be wrong.'));
+            }
+        } else {
+            writeln(yellow('Received HTTP 200 but no access token in response.'));
+        }
+    } elseif ($httpCode === 401 || $httpCode === 403) {
+        writeln(red("Authentication failed (HTTP {$httpCode})."));
+        writeln(yellow('Common causes:'));
+        writeln(yellow('  - Client ID or secret is incorrect'));
+        writeln(yellow('  - No user assigned under "Client Credentials settings"'));
+        writeln(yellow('  - Required scopes not enabled'));
+    } elseif (str_contains($response ?? '', '<html') || str_contains($response ?? '', '<!DOCTYPE')) {
+        writeln(red("Received an HTML response (HTTP {$httpCode})."));
+        writeln(yellow('This usually means the URL is wrong or does not have Simple OAuth enabled.'));
+    } else {
+        writeln(red("Unexpected response (HTTP {$httpCode})."));
+        writeln(dim(substr($response ?? '', 0, 200)));
+    }
+}
+
+writeln();
+writeln(green(bold('Canvas setup complete!')));
+writeln('Try it: ' . bold('npx canvas validate') . dim(' (host: ') . bold('ddev exec npx canvas validate') . dim(')'));
+writeln();

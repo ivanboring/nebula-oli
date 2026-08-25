@@ -1,0 +1,13 @@
+# Web-image extras for this project (merged into the DDEV web build).
+# Installs the OS libraries headless Chromium needs (Nebula's Playwright and
+# the visual-verification skills use it), plus the NSS tools that provide
+# `certutil` for trusting the mkcert CA at start.
+
+# Chromium OS dependencies (version-independent).
+RUN npx -y playwright install-deps chromium
+
+# certutil, for adding the mkcert CA to the container's NSS store on start.
+RUN apt-get update && apt-get install -y libnss3-tools
+
+# Clean up to save image space.
+RUN apt-get clean && rm -rf /var/lib/apt/lists/*

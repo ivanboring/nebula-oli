@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+## Description: Restart the Canvas Workbench daemon.
+## Usage: workbench-restart
+## Example: "ddev workbench-restart"
+set -euo pipefail
+
+supervisorctl restart webextradaemons:workbench

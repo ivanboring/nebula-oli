@@ -1,0 +1,4 @@
+# Config-repo gitignore only. At scaffold time fetch-nebula.sh overwrites this
+# file with Nebula's own .gitignore (which covers node_modules, .env, dist, …).
+.env
+node_modules

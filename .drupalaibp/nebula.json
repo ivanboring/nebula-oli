@@ -1,0 +1,25 @@
+{
+  "label": "Nebula (Drupal Canvas Code Components) with Canvas Workbench",
+  "weight": 0,
+  "ddev_project_type": "php",
+  "is_drupal": false,
+  "launch_path": ":5173",
+  "agents": ["claude"],
+  "deny_commands": ["git push", "ssh"],
+  "hooks": {
+    "ddev_started": [
+      { "script": "./fetch-nebula.sh", "weight": 3, "where": "web" },
+      { "script": "./reinit-git.sh", "weight": 5, "where": "web" },
+      { "script": "./install-deps.sh", "weight": 9, "where": "web" }
+    ],
+    "before_announce_complete": [
+      { "script": "./finalize-project.sh", "weight": 10, "where": "web" },
+      { "script": "./hosted-canvas-setup.sh", "weight": 20, "where": "host" }
+    ]
+  },
+  "append_welcome_text": [
+    "{BOLD}Canvas Workbench{RESET} is running at {GREEN}{SITE_URL}:5173{RESET}",
+    "Connect to a Drupal Canvas site (e.g. Acquia Source) with {BOLD}ddev canvas-setup{RESET} — or skip it and add the data later. {BOLD}npx canvas validate{RESET} / {BOLD}npx canvas push{RESET} then work against it.",
+    "Handy: {BOLD}ddev npm run dev{RESET} (Workbench), {BOLD}ddev workbench-restart{RESET}, {BOLD}ddev npm run code:check{RESET}, {BOLD}ddev claude{RESET}."
+  ]
+}
