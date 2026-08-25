@@ -1,0 +1,47 @@
+#!/bin/bash
+## Description: Claude Code on the project-isolated config home the eval harness uses (no operator skills, hooks or history)
+## Usage: claude-isolated [claude args]
+## Example: "ddev claude-isolated"
+
+# `ddev claude` runs on the container home, which the installer mirrors from
+# the OPERATOR'S host ~/.claude on every start: credentials, but also
+# personal skills, agents, hooks, global CLAUDE.md and session history.
+# Fine for interactive work, poison for a measured migration - the graded
+# system would be "the kit plus whatever the operator carries". The eval
+# harness therefore runs the agent on a project-local CLAUDE_CONFIG_DIR
+# (.ddev/claude-code/.claude, gitignored) holding ONLY a credential and the
+# workspace trust, so the agent sees this project's skills and nothing
+# else. This command is that launch, interactive: use it for a manual
+# episode you intend to grade with `ddev eval grade`.
+set -eu
+cfg=/var/www/html/.ddev/claude-code/.claude
+mkdir -p "$cfg"
+
+# Workspace trust for /var/www/html (same as harness/nebula-prep.sh).
+python3 - <<'PY'
+import json, pathlib
+p = pathlib.Path("/var/www/html/.ddev/claude-code/.claude/.claude.json")
+try:
+    d = json.loads(p.read_text())
+except (FileNotFoundError, json.JSONDecodeError):
+    d = {}
+d.setdefault("projects", {}).setdefault("/var/www/html", {})["hasTrustDialogAccepted"] = True
+p.write_text(json.dumps(d, indent=2))
+PY
+
+# Credential: take the container home's when the isolated one is missing
+# or older (tokens rotate; a fresh /login or start lands there first).
+if [ -s "$HOME/.claude/.credentials.json" ] \
+   && [ ! "$HOME/.claude/.credentials.json" -ef "$cfg/.credentials.json" ] \
+   && { [ ! -s "$cfg/.credentials.json" ] \
+        || [ "$HOME/.claude/.credentials.json" -nt "$cfg/.credentials.json" ]; }; then
+  cp -f "$HOME/.claude/.credentials.json" "$cfg/.credentials.json"
+fi
+chmod 600 "$cfg/.credentials.json" 2>/dev/null || true
+if [ ! -s "$cfg/.credentials.json" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]; then
+  echo "claude-isolated: no credential in $cfg and none in the container home; run 'ddev claude', /login, /exit, then retry" >&2
+  exit 1
+fi
+
+cd /var/www/html
+exec env CLAUDE_CONFIG_DIR="$cfg" claude "$@"
