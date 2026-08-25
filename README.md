@@ -51,8 +51,8 @@ bash <(curl -fsSL https://project.pages.drupalcode.org/one_line_installer/drupal
   projects), with the DDEV CA trusted inside the container so headless Chrome
   can load `https://*.ddev.site` pages.
 - **A clean git repository**: the scaffold replaces this repo's history and
-  origin with a fresh, origin-less repo and stages the finished project as a
-  single baseline commit.
+  origin with a fresh, origin-less repo and commits the finished project as a
+  single baseline, so your first diff is against a sensible starting point.
 - **An optional Canvas connection**: the install finishes with the interactive
   `ddev canvas-setup` wizard, which writes `.env` for a hosted Acquia Source
   site or any Drupal site running the `canvas_oauth` module. Skip it and
@@ -100,13 +100,18 @@ ddev_started
                                       prepare hook lands on the fresh repo)
 
 before_announce_complete
-  ├─ w10 finalize-project.sh   (web)  drop .drupalaibp/, stage the baseline
-  └─ w20 hosted-canvas-setup.sh (host) interactive `ddev canvas-setup` → .env
+  ├─ w10 hosted-canvas-setup.sh (host) interactive `ddev canvas-setup` → .env
+  └─ w20 finalize-project.sh   (web)  drop .drupalaibp/ + staged hook-script
+                                      copies, fix the installer's origin note
+                                      in AGENTS.md, commit the baseline
+                                      (.env is gitignored, so the wizard's
+                                      credentials never enter it)
 ```
 
-The first `ddev start` runs before Nebula lands, so the post-start npm block is
-guarded on `package.json` and no-ops; `install-deps.sh` does the first install
-explicitly. Every later `ddev start` is covered by the post-start hooks alone.
+The first `ddev start` runs before Nebula lands, so the Workbench daemon waits
+for `node_modules` and the post-start npm block (guarded on `package.json`)
+no-ops; `install-deps.sh` does the first install explicitly. Every later
+`ddev start` is covered by the post-start hooks alone.
 
 The scaffolded project keeps Nebula's own `README.md` and `AGENTS.md` (each
 with a short appended DDEV section) — this file you are reading stays behind in

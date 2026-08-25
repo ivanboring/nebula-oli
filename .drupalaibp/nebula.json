@@ -1,6 +1,4 @@
 {
-  "label": "Nebula (Drupal Canvas Code Components) with Canvas Workbench",
-  "weight": 0,
   "ddev_project_type": "php",
   "is_drupal": false,
   "launch_path": ":5173",
@@ -13,8 +11,8 @@
       { "script": "./install-deps.sh", "weight": 9, "where": "web" }
     ],
     "before_announce_complete": [
-      { "script": "./finalize-project.sh", "weight": 10, "where": "web" },
-      { "script": "./hosted-canvas-setup.sh", "weight": 20, "where": "host" }
+      { "script": "./hosted-canvas-setup.sh", "weight": 10, "where": "host" },
+      { "script": "./finalize-project.sh", "weight": 20, "where": "web" }
     ]
   },
   "append_welcome_text": [

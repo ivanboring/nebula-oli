@@ -5,7 +5,7 @@
 # One-time first install of the Node toolchain. The first `ddev start` ran its
 # post-start hooks before Nebula landed (fetch-nebula.sh runs at ddev_started),
 # so the guarded npm block in .ddev/config.workbench.yaml was a clean no-op and
-# the Workbench daemon is crash-looping without node_modules. Do the same work
+# the Workbench daemon is idling, waiting for node_modules. Do the same work
 # here — deps, Playwright chromium, daemon restart — so the install finishes
 # with Workbench up. Every LATER `ddev start` is covered by the post-start
 # hooks, not by this script.

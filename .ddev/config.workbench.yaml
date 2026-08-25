@@ -27,12 +27,14 @@ web_extra_exposed_ports:
     http_port: 5172
     https_port: 5173
 
-# Run Canvas Workbench as a managed daemon. It crash-loops until node_modules
-# exists; the post-start hook below installs deps and restarts it
-# deterministically.
+# Run Canvas Workbench as a managed daemon. The command waits for node_modules
+# so the daemon idles instead of crash-looping on the first start (before the
+# install hooks have fetched Nebula and installed deps), then starts by itself
+# once they land. The post-start hook below still restarts it deterministically
+# after installing deps.
 web_extra_daemons:
   - name: workbench
-    command: "npm run dev -- --host=0.0.0.0 --port=5173"
+    command: "bash -c 'until [ -d node_modules ]; do sleep 2; done; exec npm run dev -- --host=0.0.0.0 --port=5173'"
     directory: /var/www/html
 
 hooks:

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # drupalaibp hook — runs on the HOST (where=host), before_announce_complete
-# (weight 20 — after finalize-project.sh's baseline staging, so the wizard's
-# .env stays an uncommitted secret).
+# (weight 10 — before finalize-project.sh, which cleans up this script's
+# staged copy afterwards; the .env the wizard writes is gitignored by Nebula,
+# so the baseline commit never includes it).
 #
 # There is no local Drupal site in this build, so the project connects to a
 # hosted Drupal Canvas site (e.g. Acquia Source). Run the interactive
