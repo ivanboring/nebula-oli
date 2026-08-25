@@ -14,11 +14,9 @@ The package travels by scp or DM, **never** chat, issue, or commit:
 1. **The env file** - the five keys below, plain `KEY=VALUE`, no shell
    syntax. `CANVAS_JSONAPI_PREFIX=api` (Acquia Source) may ride along.
 2. **The site's baseline keep-list(s)** - `acquia-baseline-*.json`, the
-   frozen pristine-site inventory the sweep verifies against. Drop them
-   into the fetched instrument's `harness/` directory
-   (`.drupalaibp/evals/core/evals/canvas-migration/harness/`). Re-running
-   `setup-evals.sh` after a `core.pin` bump replaces `core/` - copy them
-   back in afterwards.
+   frozen pristine-site inventory the sweep verifies against. These can be
+   captured on the bed as described below, or supplied in the handover and
+   dropped into `.abp-eval/handover/`.
 
 | Key | Plane | What it unlocks |
 |---|---|---|
@@ -42,6 +40,23 @@ fails any run that leaks a value into the workspace. The instrument copies
 the file to the bed's `.env` (mode 0600, gitignored by Nebula) - the same
 file `ddev canvas-setup` would have written, so the canvas CLI and
 Workbench use the same connection the graders do.
+
+`ddev canvas-setup` now also prompts optionally for the served site URL and
+shield password, so `ABP_SERVED_SITE_URL` and
+`ABP_SERVED_SHIELD_PASSWORD` no longer need to be added to `.env` by hand.
+
+### Capture the baseline on the bed
+
+Once the bed is armed, its baseline keep-lists can be produced in place:
+
+```bash
+ddev eval capture-baseline
+```
+
+This freezes the site's current clean state into
+`.abp-eval/handover/acquia-baseline-<date>.json`. Run it only when the site
+is actually at its intended clean state. Alternatively, keep hand-carrying
+the handover JSON and drop it into `.abp-eval/handover/`.
 
 ## One command
 

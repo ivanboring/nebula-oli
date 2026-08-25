@@ -122,6 +122,12 @@ if ($clientSecret === '') {
 writeln(dim('Drupal\'s default JSON:API prefix is "jsonapi"; Acquia Source uses "api".'));
 $jsonapiPrefix = prompt('JSON:API prefix', 'jsonapi');
 
+$servedUrl = trimUrl(prompt('Served site URL for eval grading (optional, e.g. https://<name>.acquia.site; leave blank to skip)'));
+$servedShield = '';
+if ($servedUrl !== '') {
+    $servedShield = secret('Shield password for the served site (optional, leave blank if no shield)');
+}
+
 writeln();
 
 // ── 4. Summary & Drupal instructions ─────────────────────────────────────────
@@ -176,6 +182,12 @@ CANVAS_CLIENT_SECRET={$clientSecret}
 CANVAS_JSONAPI_PREFIX={$jsonapiPrefix}
 
 ENV;
+    if ($servedUrl !== '') {
+        $envContent .= "ABP_SERVED_SITE_URL={$servedUrl}\n";
+    }
+    if ($servedShield !== '') {
+        $envContent .= "ABP_SERVED_SHIELD_PASSWORD={$servedShield}\n";
+    }
     file_put_contents($envPath, $envContent);
     writeln(green('.env written successfully.'));
 
