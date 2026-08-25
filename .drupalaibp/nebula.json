@@ -4,6 +4,13 @@
   "launch_path": ":5173",
   "agents": ["claude"],
   "deny_commands": ["git push", "ssh"],
+  "copy_paths": [
+    "./.ddev/config.workbench.yaml",
+    "./.ddev/web-build/Dockerfile.workbench",
+    "./.ddev/commands/web/canvas-setup",
+    "./.ddev/commands/web/workbench-restart",
+    "./index.php"
+  ],
   "hooks": {
     "ddev_started": [
       { "script": "./fetch-nebula.sh", "weight": 3, "where": "web" },

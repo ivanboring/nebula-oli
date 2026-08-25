@@ -74,17 +74,19 @@ the baseline is staged before the connection wizard writes it.
 
 ## How it works
 
-`nebula.json` declares a non-Drupal DDEV `php` project, so the whole clone of
-this repo is overlaid into the new project **before** the first `ddev start`,
-bringing the tracked `.ddev/` files:
+Everything except this README and `.gitignore` lives inside `.drupalaibp/`.
+`nebula.json` declares a non-Drupal DDEV `php` project, and its `copy_paths`
+stage the DDEV pieces from `.drupalaibp/` into the project root **before** the
+first `ddev start`:
 
-- `config.workbench.yaml` — Node 22, the Workbench daemon, router port 5173
-  (http 5172), and post-start hooks that install npm deps + chromium and keep
-  the daemon healthy on every start. It also sets
+- `.ddev/config.workbench.yaml` — Node 22, the Workbench daemon, router port
+  5173 (http 5172), and post-start hooks that install npm deps + chromium and
+  keep the daemon healthy on every start. It also sets
   `__VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=.ddev.site`: Workbench is a Vite dev
   server, and Vite rejects the router's `*.ddev.site` Host header without it.
-- `web-build/Dockerfile.workbench` — chromium OS deps and `certutil`.
-- `commands/web/` — `ddev canvas-setup` and `ddev workbench-restart`.
+- `.ddev/web-build/Dockerfile.workbench` — chromium OS deps and `certutil`.
+- `.ddev/commands/web/` — `ddev canvas-setup` and `ddev workbench-restart`.
+- `index.php` — redirects `/` on the main URL to Workbench.
 
 The one-time scaffold steps ride on installer events as `.drupalaibp/` hooks,
 and are deleted from the finished project:
