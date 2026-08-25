@@ -1,22 +1,13 @@
-# Arming a Nebula bed: operator handover
+# Arming a Nebula bed
 
-A `nebula-evals` install gives you the instrument, the referee service and
-the read-only commands. It does not give you an **armed bed**, and that is
-structural: this kit deploys to a remote Drupal Canvas site (Acquia
-Source), so arming needs the site's credentials and its frozen baseline, a
-package that never travels with an install. This page is the contract for
-that handover and the one command that consumes it.
+A `nebula-evals` install gives you the kit and referee service. `ddev
+canvas-setup` supplies the remote Drupal Canvas credentials, arms the bed
+and captures the clean-site baseline in one place. No hand-carried
+handover JSON is needed for the normal operator flow.
 
-## What the operator hands you
-
-The package travels by scp or DM, **never** chat, issue, or commit:
-
-1. **The env file** - the five keys below, plain `KEY=VALUE`, no shell
-   syntax. `CANVAS_JSONAPI_PREFIX=api` (Acquia Source) may ride along.
-2. **The site's baseline keep-list(s)** - `acquia-baseline-*.json`, the
-   frozen pristine-site inventory the sweep verifies against. These can be
-   captured on the bed as described below, or supplied in the handover and
-   dropped into `.abp-eval/handover/`.
+The credentials still deserve handover discipline: move them by scp or DM,
+**never** chat, issue, or commit. Canvas setup writes them to the bed's
+gitignored `.env`; no secret belongs in the arming evidence or scoreboard.
 
 | Key | Plane | What it unlocks |
 |---|---|---|
@@ -32,128 +23,112 @@ the page a visitor sees; every pixel measured there is shifted, and a
 calibration made through it once inverted a centering verdict. Page facts
 come from `ABP_SERVED_SITE_URL` + shield cookie, API facts from
 `CANVAS_SITE_URL` + bearer. A bed missing the two `ABP_SERVED_*` keys
-cannot grade the page plane at all - `nebula-prep.sh` refuses to arm it.
+cannot grade the page plane at all.
 
-Handling rules (enforced, not advisory): `chmod 600` the file the moment
-it lands; never commit it or paste values anywhere; `cm38_secrets_clean`
-fails any run that leaks a value into the workspace. The instrument copies
-the file to the bed's `.env` (mode 0600, gitignored by Nebula) - the same
-file `ddev canvas-setup` would have written, so the canvas CLI and
-Workbench use the same connection the graders do.
+Handling rules are enforced, not advisory: never commit credentials or
+paste values anywhere; `cm38_secrets_clean` fails any run that leaks a
+value into the workspace.
 
-`ddev canvas-setup` now also prompts optionally for the served site URL and
-shield password, so `ABP_SERVED_SITE_URL` and
-`ABP_SERVED_SHIELD_PASSWORD` no longer need to be added to `.env` by hand.
+## Run a migration
 
-### Capture the baseline on the bed
-
-Once the bed is armed, its baseline keep-lists can be produced in place:
+Install the eval-enabled kit:
 
 ```bash
-ddev eval capture-baseline
+bash <(curl -fsSL https://project.pages.drupalcode.org/one_line_installer/drupalaibp) \
+  https://github.com/ivanboring/nebula-oli --config nebula-evals
 ```
 
-This freezes the site's current clean state into
-`.abp-eval/handover/acquia-baseline-<date>.json`. Run it only when the site
-is actually at its intended clean state. Alternatively, keep hand-carrying
-the handover JSON and drop it into `.abp-eval/handover/`.
-
-## One command
-
-From the project root on the host (this is `ddev eval run`'s answer too):
+Then, from the new project root:
 
 ```bash
-.drupalaibp/evals/core/evals/canvas-migration/abp-eval nebula \
-  -p . --env /path/to/handover.env --source-url https://freelygive.io/
+ddev canvas-setup
+ddev claude-isolated
 ```
 
-Without `--reset-verified` this is free and safe to repeat: it recognises
-the bed as the nebula-oli shape (`.ddev/config.workbench.yaml`), validates
-the env file through the whitelist parser, installs it as `.env`, restarts
-the Workbench daemon on the new connection, seeds `.abp-eval/state.json`
-(the arming evidence `ddev eval grade` gates on), trusts the in-container
-agent's config home, and then **stops** with the two pending items:
+Canvas setup prompts for the Canvas API and served-site credentials plus
+the source website shown on the scoreboard. It writes `.env`, restarts
+Workbench, arms `.abp-eval/state.json`, trusts the isolated agent workspace
+and captures the freshly created Acquia Source site as the sweep baseline.
+This setup-time capture is the reliable clean moment; if it cannot reach
+the site, setup remains successful and tells you to capture the baseline
+before migrating.
 
-- **LOGIN PENDING** - the agent runs inside the web container under the
-  project-isolated config home `.ddev/claude-code/.claude`. It takes the
-  credential from the container home at launch (the installer mirrors your
-  host login there; if there is none, `ddev claude`, `/login` once,
-  `/exit`).
-- **RESET PENDING** - the remote site must be at its frozen baseline before
-  a graded run (below).
+Give the isolated agent this migration prompt:
 
-`ddev eval grade` works from this point on: it scores the bed's current
-state, no AI, no cost. On a freshly armed bed that is a RUN INVALID board
-(nothing migrated yet) - the free way to prove the plumbing before paying.
+> Recreate https://freelygive.io/ as closely as possible in Drupal Canvas.
 
-### A manual episode (run it yourself, then grade)
-
-Grade-only also scores a migration you drive interactively. Do it on the
-isolated config home, not on `ddev claude`: the installer mirrors your
-host `~/.claude` (skills, hooks, agents, history) into the container home,
-and a migration made with the operator's toolbox loaded is not a
-measurement of the kit.
+Use the isolated config home, not `ddev claude`: the latter loads the
+operator's mirrored skills, hooks, agents and history, which is not a
+measurement of the kit. When the migration finishes:
 
 ```bash
-ddev claude-isolated     # same launch as the harness: project skills only
-ddev eval grade          # afterwards, from the bed root
+ddev eval grade
+ddev eval view
+ddev eval export
 ```
 
-Give the agent the harness's task text (`harness/agentic-run.sh`, the
-`workbench` kit branch) for a comparable episode. The board is grade-only:
-no cost or time line (those come from the harness's `-p` envelope) and the
-delta oracle uses the frozen baseline count, not a pre-agent snapshot. A
-manual episode does not mark the bed consumed, so never follow it with a
-harness run on the same bed: the harness would grade your work as its own.
+Grade is AI-free and has no cost. The board is grade-only: cost and time
+come only from the harness's `-p` envelope, and the delta oracle uses the
+frozen setup baseline rather than a pre-agent snapshot. Run one grade at a
+time; the referee lock rejects parallel grades because they share browser
+and staging state.
 
-## The paid run
+## Run it again
+
+First inspect the live-minus-baseline reset plan, then apply it:
+
+```bash
+ddev eval sweep
+ddev eval sweep --yes
+ddev claude-isolated
+```
+
+`sweep` without `--yes` is read-only. `sweep --yes` deletes remote residue,
+verifies the site against the baseline captured by canvas-setup, and writes
+a full pre-delete rollback record to
+`.abp-eval/acquia-prereset-<timestamp>.json`. After the reset, give the
+isolated agent the migration prompt again and grade the result.
+
+Never sweep while an agent run or grade is in flight. The plan is
+live-minus-baseline, which mid-run *is* the agent's work. The grade lock
+protects only this bed; it cannot see another process using the shared
+remote site.
+
+## Diagnostics / advanced
+
+`ddev eval preflight` proves both auth planes, JSON:API discovery and
+writes, and a self-cleaning probe page before a paid run.
+
+`ddev eval capture-baseline [--force]` freezes the **CURRENT** site state as
+clean. Normally canvas-setup has already done this. Use the command only
+after a setup-time capture failed, or on a fresh template or just-swept
+site. It refuses to bless a second baseline unless you delete the existing
+file or pass `--force`; force removes the foot-gun guard, not the clean-site
+requirement.
+
+The hands-off harness is the only flow that still uses the standalone
+arming script:
 
 ```bash
 .drupalaibp/evals/core/evals/canvas-migration/abp-eval nebula \
   -p . --env /path/to/handover.env --source-url https://freelygive.io/ --reset-verified
 ```
 
-`--reset-verified` is the operator attestation that `acquia-reset.sh`
-exited 0 for this site since the last episode, and it confirms the paid
-run (roughly $30-50 and an hour, model pinned by the instrument). The
-migration agent runs **in the web container** (`CANVAS_CLAUDE_LOCATION=ddev`,
-OS-confined, the operator's personal config never loads), with the 12
-workspace-only cases skipped; grading follows immediately and the board
-lands under `core/evals/canvas-migration/runs/`. Browse it with
-`ddev eval view` or `ddev eval web`.
+`--reset-verified` attests that the sweep exited 0 since the last episode
+and confirms the paid run. The agent runs in the web container with the
+operator's personal config excluded; grading follows automatically. Never
+run the harness after a manual episode on the same bed, and never re-arm a
+consumed harness bed: it would grade prior work as its own. A new harness
+episode needs a fresh install and a verified sweep.
 
-## Site discipline (the site is shared and remote)
+## Site discipline (the site is remote)
 
-There is no local reset on this kit - not of the site, and not of the bed:
-
-- **One episode per install.** A migration leaves its build in the
-  workspace (`src/`, `pages/`); the instrument marks the bed consumed and
-  refuses a second graded run on it. The next episode is a fresh
-  `nebula-evals` install into a new directory.
-- **One episode per sweep.** The site is returned to its frozen baseline by
-  the operator-run sweep (`harness/acquia-reset.sh`, run inside the
-  referee service as `ddev eval sweep`), never by improvised deletes. Run
-  it without `--yes` first (a free, read-only plan), read the plan, then
-  with `--yes`:
-
-  ```bash
-  ddev eval sweep          # plan only: inventory + what would be deleted
-  ddev eval sweep --yes    # the sweep, then a verify against the baseline
-  ```
-
-  It reads the armed bed's own `.env` (so it only works after arming) and
-  needs the baseline keep-lists from the handover: drop them in
-  `.abp-eval/handover/` (survives a core refetch) or in the instrument's
-  `harness/`. No matching baseline is a hard, correct refusal. Every sweep
-  writes a full pre-delete rollback record to
-  `.abp-eval/acquia-prereset-<timestamp>.json` - keep those. The command
-  refuses while a grade holds this bed's lock.
-- **Never sweep while a run is in flight.** The plan is live-minus-baseline,
-  which mid-run *is* the agent's work.
-- `ddev eval preflight` proves the whole lane (auth on both planes,
-  JSON:API discovery and writes, a self-cleaning probe page) for free
-  before anything paid fires. Same script as `harness/acquia-preflight.sh`,
-  run inside the referee service against the armed bed's `.env`.
+There is no local Drupal reset on this kit. The site is returned to its
+frozen baseline only by the operator-run sweep, never by improvised
+deletes. No matching baseline is a hard, correct refusal. Keep the rollback
+records. The harness additionally treats its workspace bed as
+single-use: a consumed bed stays consumed even after the remote site is
+swept.
 
 ## What differs from the canvas-storybook kit
 
