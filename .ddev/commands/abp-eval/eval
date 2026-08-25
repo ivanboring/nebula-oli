@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-## Description: Run the canvas-migration eval harness inside the abp-eval referee service (grade, list, view, web, show, export)
-## Usage: eval [ABP_VAR=value ...] [grade|list|view|web|show|export] [args]
+## Description: Run the canvas-migration eval harness inside the abp-eval referee service (grade, list, view, web, show, export, preflight, sweep)
+## Usage: eval [ABP_VAR=value ...] [grade|list|view|web|show|export|preflight|sweep [--yes]] [args]
 ## Example: "ddev eval grade"
 ## ExecRaw: true
 
@@ -66,11 +66,48 @@ case "${1:-}" in
     # agentic (paid) run stays host-driven - it needs the ddev CLI and the
     # operator attestation this container does not carry. On this kit the
     # arm-and-launch front door is `abp-eval nebula`; there is no in-place
-    # reset (a new episode is a fresh install, see NEBULA-ARM.md).
+    # reset (a new episode is a fresh install, see NEBULA-ARM.md). The
+    # REMOTE site is reset by `ddev eval sweep`, containerised below.
     echo "eval: '$1' is host-driven - from the project root on the host, run:" >&2
     echo "  $ABP_EVAL_DIR/abp-eval nebula -p . --env <handover-env-file> --source-url $ABP_SOURCE_SITE [--reset-verified]" >&2
     echo "  (see .drupalaibp/evals/NEBULA-ARM.md)" >&2
     exit 2
+    ;;
+  preflight|sweep)
+    # The site-plane operator steps, containerised. Both read the ARMED
+    # bed's own credential file ($ABP_PROJECT_DIR/.env, mode 600, inside the
+    # read-only project mount), so the handover needs no second copy on the
+    # host, and both run on the referee image's curl + jq + python3: the
+    # laptop contract stays docker + ddev + git.
+    #   preflight      proves auth on both planes, JSON:API writes and the
+    #                  page resource (free, self-cleaning probe page)
+    #   sweep          prints the delta plan against the baseline keep lists
+    #   sweep --yes    DELETES the residue on the REMOTE Source site, then
+    #                  verifies; the rollback inventory lands in .abp-eval/
+    # Threat model note: sweep hands this socket-holding service remote
+    # delete power over the site. It is operator-invoked and --yes gated,
+    # never automatic, and it refuses while a grade holds the bed lock.
+    # Doctrine: never sweep while an agent run is in flight anywhere on the
+    # site; the lock only sees this bed's grades.
+    sub="$1"; shift
+    if [ ! -s "$ABP_PROJECT_DIR/.env" ]; then
+      echo "eval: bed not armed (no .env) - $sub needs the site credentials that arming installs" >&2
+      echo "  on the host, from the project root: $ABP_EVAL_DIR/abp-eval nebula -p . --env <handover-env-file> --source-url $ABP_SOURCE_SITE" >&2
+      exit 1
+    fi
+    if [ "$sub" = sweep ] && command -v flock >/dev/null 2>&1; then
+      exec 9> /tmp/abp-eval-grade.lock
+      flock -n 9 || { echo "eval: a grade is running for this bed - never sweep mid-grade" >&2; exit 1; }
+    fi
+    case "$sub" in
+      preflight) exec bash "$ABP_EVAL_DIR/harness/acquia-preflight.sh" "$ABP_PROJECT_DIR/.env" ;;
+      sweep)
+        case " $* " in
+          *" --yes "*) ;;
+          *) echo "eval: plan only, nothing is deleted; rerun as 'ddev eval sweep --yes' to sweep the site" ;;
+        esac
+        exec bash "$ABP_EVAL_DIR/harness/acquia-reset.sh" "$ABP_PROJECT_DIR/.env" "$@" ;;
+    esac
     ;;
   grade)
     # Grading gates on the arming evidence (.abp-eval/state.json). On this

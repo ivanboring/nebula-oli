@@ -52,9 +52,12 @@ quality.
 
 `ddev eval` is a service command: it executes inside the `abp-eval`
 service, the referee container promoted to a ddev service (python, node,
-chromium, agent-browser and a docker CLI are baked into its image), so the
-host needs only docker and ddev. `ddev exec` does not forward host shell
-environment - pass operator overrides as leading arguments instead:
+chromium, agent-browser, curl, jq and a docker CLI are baked into its
+image), so grading, the site preflight and the site sweep need only docker
+and ddev on the host (`ddev eval preflight`, `ddev eval sweep`); arming
+(`abp-eval nebula`) additionally needs python3 on the host. `ddev exec`
+does not forward host shell environment - pass operator overrides as
+leading arguments instead:
 
 ```bash
 ddev eval ABP_PAGE_STORY_ID=pages-home--default grade

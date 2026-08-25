@@ -96,23 +96,29 @@ There is no local reset on this kit - not of the site, and not of the bed:
   refuses a second graded run on it. The next episode is a fresh
   `nebula-evals` install into a new directory.
 - **One episode per sweep.** The site is returned to its frozen baseline by
-  the operator-run sweep, `harness/acquia-reset.sh`, never by improvised
-  deletes. Run it without `--yes` first (a free, read-only plan), read the
-  plan, then with `--yes`:
+  the operator-run sweep (`harness/acquia-reset.sh`, run inside the
+  referee service as `ddev eval sweep`), never by improvised deletes. Run
+  it without `--yes` first (a free, read-only plan), read the plan, then
+  with `--yes`:
 
   ```bash
-  bash .drupalaibp/evals/core/evals/canvas-migration/harness/acquia-reset.sh /path/to/handover.env         # plan
-  bash .drupalaibp/evals/core/evals/canvas-migration/harness/acquia-reset.sh /path/to/handover.env --yes   # sweep
+  ddev eval sweep          # plan only: inventory + what would be deleted
+  ddev eval sweep --yes    # the sweep, then a verify against the baseline
   ```
 
-  It needs the baseline keep-list in the instrument's `harness/` dir (no
-  matching baseline is a hard, correct refusal) and writes a full
-  pre-delete rollback record (`acquia-prereset-*.json`) - keep those.
+  It reads the armed bed's own `.env` (so it only works after arming) and
+  needs the baseline keep-lists from the handover: drop them in
+  `.abp-eval/handover/` (survives a core refetch) or in the instrument's
+  `harness/`. No matching baseline is a hard, correct refusal. Every sweep
+  writes a full pre-delete rollback record to
+  `.abp-eval/acquia-prereset-<timestamp>.json` - keep those. The command
+  refuses while a grade holds this bed's lock.
 - **Never sweep while a run is in flight.** The plan is live-minus-baseline,
   which mid-run *is* the agent's work.
-- `harness/acquia-preflight.sh /path/to/handover.env` proves the whole lane
-  (auth on both planes, JSON:API writes enabled, MCP reachable) for free
-  before anything paid fires.
+- `ddev eval preflight` proves the whole lane (auth on both planes,
+  JSON:API discovery and writes, a self-cleaning probe page) for free
+  before anything paid fires. Same script as `harness/acquia-preflight.sh`,
+  run inside the referee service against the armed bed's `.env`.
 
 ## What differs from the canvas-storybook kit
 
