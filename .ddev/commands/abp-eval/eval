@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-## Description: Run the canvas-migration eval harness inside the abp-eval referee service (grade, list, view, web, show, export, preflight, sweep)
-## Usage: eval [ABP_VAR=value ...] [grade|list|view|web|show|export|preflight|sweep [--yes]] [args]
+## Description: Run the canvas-migration eval harness inside the abp-eval referee service (grade, list, view, web, show, export, preflight, capture-baseline, sweep)
+## Usage: eval [ABP_VAR=value ...] [grade|list|view|web|show|export|preflight|capture-baseline|sweep [--yes]] [args]
 ## Example: "ddev eval grade"
 ## ExecRaw: true
 
@@ -73,14 +73,16 @@ case "${1:-}" in
     echo "  (see .drupalaibp/evals/NEBULA-ARM.md)" >&2
     exit 2
     ;;
-  preflight|sweep)
-    # The site-plane operator steps, containerised. Both read the ARMED
+  preflight|capture-baseline|sweep)
+    # The site-plane operator steps, containerised. All read the ARMED
     # bed's own credential file ($ABP_PROJECT_DIR/.env, mode 600, inside the
     # read-only project mount), so the handover needs no second copy on the
-    # host, and both run on the referee image's curl + jq + python3: the
+    # host, and all run on the referee image's curl + jq + python3: the
     # laptop contract stays docker + ddev + git.
     #   preflight      proves auth on both planes, JSON:API writes and the
     #                  page resource (free, self-cleaning probe page)
+    #   capture-baseline
+    #                  freezes the current clean site as the keep lists
     #   sweep          prints the delta plan against the baseline keep lists
     #   sweep --yes    DELETES the residue on the REMOTE Source site, then
     #                  verifies; the rollback inventory lands in .abp-eval/
@@ -101,6 +103,7 @@ case "${1:-}" in
     fi
     case "$sub" in
       preflight) exec bash "$ABP_EVAL_DIR/harness/acquia-preflight.sh" "$ABP_PROJECT_DIR/.env" ;;
+      capture-baseline) exec bash "$ABP_EVAL_DIR/harness/acquia-capture-baseline.sh" "$ABP_PROJECT_DIR/.env" --yes ;;
       sweep)
         case " $* " in
           *" --yes "*) ;;
