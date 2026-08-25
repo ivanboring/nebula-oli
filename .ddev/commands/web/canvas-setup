@@ -127,6 +127,7 @@ $servedShield = '';
 if ($servedUrl !== '') {
     $servedShield = secret('Shield password for the served site (optional, leave blank if no shield)');
 }
+$sourceUrl = trimUrl(prompt('Website you plan to migrate (shown on the eval scoreboard)', 'https://freelygive.io/'));
 
 writeln();
 
@@ -273,7 +274,113 @@ if (confirm('Test the connection now?')) {
     }
 }
 
+$projectDir = '/var/www/html';
+$evalStateDir = $projectDir . '/.abp-eval';
+$statePath = $evalStateDir . '/state.json';
+$claudeConfigDir = $projectDir . '/.ddev/claude-code/.claude';
+$claudeConfigPath = $claudeConfigDir . '/.claude.json';
+$handoverDir = $evalStateDir . '/handover';
+$shouldArm = $writeEnv || !file_exists($statePath) || !file_exists($claudeConfigPath);
+
+if ($shouldArm) {
+    if (!is_dir($evalStateDir)) {
+        mkdir($evalStateDir, 0700, true);
+    }
+    chmod($evalStateDir, 0700);
+
+    if (!is_dir($claudeConfigDir)) {
+        mkdir($claudeConfigDir, 0700, true);
+    }
+    $claudeConfig = [];
+    if (file_exists($claudeConfigPath)) {
+        $existingConfig = json_decode((string) file_get_contents($claudeConfigPath), true);
+        if (is_array($existingConfig)) {
+            $claudeConfig = $existingConfig;
+        }
+    }
+    if (!isset($claudeConfig['projects']) || !is_array($claudeConfig['projects'])) {
+        $claudeConfig['projects'] = [];
+    }
+    if (!isset($claudeConfig['projects'][$projectDir]) || !is_array($claudeConfig['projects'][$projectDir])) {
+        $claudeConfig['projects'][$projectDir] = [];
+    }
+    $claudeConfig['projects'][$projectDir]['hasTrustDialogAccepted'] = true;
+    file_put_contents(
+        $claudeConfigPath,
+        json_encode($claudeConfig, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+    );
+    chmod($claudeConfigPath, 0600);
+
+    $baselineFiles = glob($handoverDir . '/acquia-baseline-*.json') ?: [];
+    $baselineCaptured = $baselineFiles !== [];
+    if ($baselineCaptured) {
+        sort($baselineFiles);
+        $baselineFile = basename(end($baselineFiles));
+        writeln(dim("baseline exists ({$baselineFile}); to recapture on a clean site, delete it and run ddev eval capture-baseline"));
+    } else {
+        writeln('Capturing the clean-site baseline (used by ddev eval sweep to reset)...');
+        $captureCommand = 'ABP_PROJECT_DIR=/var/www/html bash '
+            . '/var/www/html/.drupalaibp/evals/core/evals/canvas-migration/harness/acquia-capture-baseline.sh '
+            . '/var/www/html/.env --yes';
+        passthru($captureCommand, $captureExitCode);
+        $baselineFiles = glob($handoverDir . '/acquia-baseline-*.json') ?: [];
+        $baselineCaptured = $captureExitCode === 0 && $baselineFiles !== [];
+        if ($baselineCaptured) {
+            sort($baselineFiles);
+            $baselineFile = basename(end($baselineFiles));
+            writeln(green("Clean-site baseline captured: {$baselineFile}"));
+        } else {
+            writeln(yellow('Baseline not captured; run ddev eval capture-baseline once before migrating.'));
+        }
+    }
+
+    if (file_exists($statePath)) {
+        $existingState = json_decode((string) file_get_contents($statePath), true);
+        $resetAt = is_array($existingState) && isset($existingState['reset_at'])
+            ? (string) $existingState['reset_at']
+            : 'unknown';
+        writeln(dim("bed already armed ({$resetAt}); leaving state.json alone"));
+    } else {
+        $revisionOutput = [];
+        exec('git -C /var/www/html rev-parse --short HEAD 2>/dev/null', $revisionOutput, $revisionExitCode);
+        $revision = $revisionExitCode === 0 && isset($revisionOutput[0])
+            ? trim($revisionOutput[0])
+            : 'unknown';
+        if ($revision === '') {
+            $revision = 'unknown';
+        }
+        $resetDate = date('Y-m-d');
+        $resetNote = "fresh scaffold {$resetDate}; site captured as baseline by canvas-setup";
+        if (!$baselineCaptured) {
+            $resetNote = "fresh scaffold {$resetDate}; baseline capture SKIPPED - run: ddev eval capture-baseline";
+        }
+        $state = [
+            'baseline_count' => '0',
+            'source_url' => $sourceUrl,
+            'skill_dir' => '.claude/skills/canvas-design-decomposition',
+            'pristine_kit' => 'nebula-oli (DDEV scaffold)',
+            'pristine_kit_rev' => $revision,
+            'scaffold_commit' => $revision,
+            'bed_shape' => 'ddev',
+            'reset_note' => $resetNote,
+            'reset_at' => date('Ymd-His'),
+        ];
+        file_put_contents(
+            $statePath,
+            json_encode($state, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) . "\n"
+        );
+    }
+    writeln();
+}
+
 writeln();
 writeln(green(bold('Canvas setup complete!')));
 writeln('Try it: ' . bold('npx canvas validate') . dim(' (host: ') . bold('ddev exec npx canvas validate') . dim(')'));
+if (file_exists($statePath)) {
+    writeln();
+    writeln(bold('Next steps:'));
+    writeln('  Migrate: ' . bold('ddev claude-isolated'));
+    writeln('  Grade:   ' . bold('ddev eval grade'));
+    writeln('  Redo:    reset with ' . bold('ddev eval sweep --yes') . ', then migrate again.');
+}
 writeln();

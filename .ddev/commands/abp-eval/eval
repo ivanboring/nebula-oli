@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-## Description: Run the canvas-migration eval harness inside the abp-eval referee service (grade, list, view, web, show, export, preflight, capture-baseline, sweep)
-## Usage: eval [ABP_VAR=value ...] [grade|list|view|web|show|export|preflight|capture-baseline|sweep [--yes]] [args]
+## Description: Run the canvas-migration eval harness inside the abp-eval referee service (grade, list, view, web, show, export, preflight, capture-baseline [--force], sweep)
+## Usage: eval [ABP_VAR=value ...] [grade|list|view|web|show|export|preflight|capture-baseline [--force]|sweep [--yes]] [args]
 ## Example: "ddev eval grade"
 ## ExecRaw: true
 
@@ -94,7 +94,7 @@ case "${1:-}" in
     sub="$1"; shift
     if [ ! -s "$ABP_PROJECT_DIR/.env" ]; then
       echo "eval: bed not armed (no .env) - $sub needs the site credentials that arming installs" >&2
-      echo "  on the host, from the project root: $ABP_EVAL_DIR/abp-eval nebula -p . --env <handover-env-file> --source-url $ABP_SOURCE_SITE" >&2
+      echo "  on the host, from the project root, run: ddev canvas-setup" >&2
       exit 1
     fi
     if [ "$sub" = sweep ] && command -v flock >/dev/null 2>&1; then
@@ -103,7 +103,20 @@ case "${1:-}" in
     fi
     case "$sub" in
       preflight) exec bash "$ABP_EVAL_DIR/harness/acquia-preflight.sh" "$ABP_PROJECT_DIR/.env" ;;
-      capture-baseline) exec bash "$ABP_EVAL_DIR/harness/acquia-capture-baseline.sh" "$ABP_PROJECT_DIR/.env" --yes ;;
+      capture-baseline)
+        baseline_files=("$ABP_PROJECT_DIR"/.abp-eval/handover/acquia-baseline-*.json)
+        if [ -e "${baseline_files[0]}" ]; then
+          case " $* " in
+            *" --force "*) ;;
+            *)
+              echo "eval: a baseline is already frozen ($(basename "${baseline_files[0]}")); capturing now would bless the CURRENT site state as clean." >&2
+              echo "  Delete it first if the site really is clean; pass --force only to bypass this guard." >&2
+              exit 1
+              ;;
+          esac
+        fi
+        exec bash "$ABP_EVAL_DIR/harness/acquia-capture-baseline.sh" "$ABP_PROJECT_DIR/.env" --yes
+        ;;
       sweep)
         case " $* " in
           *" --yes "*) ;;
@@ -113,14 +126,12 @@ case "${1:-}" in
     esac
     ;;
   grade)
-    # Grading gates on the arming evidence (.abp-eval/state.json). On this
-    # kit nebula-prep.sh seeds it from the operator's credential file - the
-    # install cannot do that, and this container cannot drive ddev.
+    # Grading gates on the arming evidence (.abp-eval/state.json), seeded
+    # by canvas-setup once the operator supplies the site credentials.
     if [ ! -f "$ABP_PROJECT_DIR/.abp-eval/state.json" ]; then
       echo "eval: bed not armed (no .abp-eval/state.json)" >&2
-      echo "  on the host, from the project root, run:" >&2
-      echo "  $ABP_EVAL_DIR/abp-eval nebula -p . --env <handover-env-file> --source-url $ABP_SOURCE_SITE" >&2
-      echo "  (the five-key credential file is the operator handover: .drupalaibp/evals/NEBULA-ARM.md)" >&2
+      echo "  on the host, from the project root, run: ddev canvas-setup" >&2
+      echo "  hands-off harness alternative: $ABP_EVAL_DIR/abp-eval nebula -p . --env <handover-env-file> --source-url $ABP_SOURCE_SITE" >&2
       exit 1
     fi
     ;;
