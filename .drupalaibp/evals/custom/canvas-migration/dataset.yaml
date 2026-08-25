@@ -1,0 +1,1020 @@
+# Canvas-migration eval set v1 (FreelyGive engagement, July 2026).
+# One agentic migration run produces a workspace; the questions grade that
+# workspace stage by stage. metadata.run_group tells the runner which
+# questions share one run (the agentic half is expensive: ~1h, ~$50).
+# Path metadata keys are the scaffold seam: the values below are the July
+# SUT (DDEV-Canvas + canvas-migration addon, storybook workspace nested
+# under storybook/). Re-target another scaffold by overriding metadata,
+# never by editing commands. See README.md.
+questions:
+- id: cm01_skill_gate
+  input: |
+    Pre-flight: verify the system under test is ready before the agentic run
+    starts - the kit's flagship skill is discoverable in the migration
+    workspace and the bed carries the reset harness's state record.
+  criteria: >
+    The kit's flagship skill file (metadata.skill_dir, injected per bed by
+    the reset harness) exists as SKILL.md (uppercase) - a lowercase skill.md
+    is invisible to Claude Code on case-sensitive filesystems and the
+    migration silently runs without the skill's process and QA gates. And
+    .abp-eval/state.json exists non-empty, proving the bed was reset to
+    baseline by the reset harness rather than graded dirty.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm01_skill_gate@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: gate
+    phase: pre_run
+    checks_dir: evals/canvas-migration/checks
+    skill_dir: .claude/skills/website-to-components
+    seeded_by: "WS0 finding 6 / DDEV-migration-addon PR #13 (2026-07-15)"
+    note: >
+      phase: pre_run - the executor runs this BEFORE the agentic run
+      (adversarial review: checked after the run, the agent could create the
+      file itself; checked before, it is a genuine environment gate). The
+      exact-name ls match defeats case-insensitive filesystems where test -f
+      SKILL.md would also match skill.md.
+- id: cm02_mechanical_complete
+  input: |
+    Run the mechanical half of the pipeline against the frozen source capture
+    (homepage scope) and confirm its outputs are complete.
+  criteria: >
+    The pipeline output directory contains a non-empty full-page screenshot,
+    a non-empty dom-sections.json, and at least one downloaded resource for
+    the scoped page.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm02_mechanical_complete@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: capture
+    checks_dir: evals/canvas-migration/checks
+    output_dir: website-to-components/output/freelygive.io
+- id: cm03_story_syntax
+  input: |
+    Validate the syntax of every generated page story in the workspace.
+  criteria: >
+    validate-page-stories.js exits 0 (no fatal problems that would prevent
+    Storybook from starting). WARN lines are acceptable.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm03_story_syntax@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: story
+    pipeline_dir: website-to-components
+    workspace: storybook
+- id: cm04_typecheck_delta
+  input: |
+    Typecheck the workspace and compare failing files against the pristine-kit
+    baseline.
+  criteria: >
+    No file outside the recorded baseline fails tsc. The pristine starter kit
+    itself fails its own typecheck (5 known locations), so a raw exit-code
+    gate can never pass; only agent-introduced errors count.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm04_typecheck_delta@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: build
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    baseline: evals/canvas-migration/harness/tsc-baseline.txt
+    seeded_by: "run-0 calibration finding 1"
+- id: cm05_canvas_validate
+  input: |
+    Validate every generated component spec against the Canvas component
+    schema.
+  criteria: >
+    `npm run canvas:validate` exits 0 with every component valid.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm05_canvas_validate@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: validate
+    workspace: storybook
+- id: cm06_story_build
+  input: |
+    Build the static Storybook site from the migrated workspace.
+  criteria: >
+    `npm run build` exits 0. Note the container policy: the build only works
+    in the storybook service container, not the web container (EACCES on the
+    node_modules volume) - the harness routes it, the case only asserts the
+    result.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm06_story_build@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: build
+    workspace: storybook
+    container: storybook
+- id: cm07_canvas_push
+  input: |
+    Push the migrated components to the local Drupal Canvas.
+  criteria: >
+    `npm run canvas:push:local` exits 0 AND reports at least
+    min_components pushed ("Push completed: N components"). A push that
+    exits 0 with a trivial count is a failure - the homepage migration
+    produced 29 on run-0, so 10 is a lenient floor. Note: stdout comes from
+    agent-writable npm scripts, so cm08's server-side delta is the
+    authoritative oracle; this check is the fast client-side signal.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm07_canvas_push@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: upload
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    min_components: "10"
+- id: cm08_push_landed
+  input: |
+    Verify server-side that the pushed components actually landed in Drupal.
+  criteria: >
+    The number of js_component entities in Drupal (via drush entityQuery)
+    EXCEEDS the post-reset baseline count. Client-side exit 0 is not proof
+    of landing, and an absolute threshold would pass on entities left by
+    prior runs (adversarial review). baseline_count is recorded by the
+    reset harness (0 on a pristine reset) and injected by the executor.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm08_push_landed@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: upload
+    checks_dir: evals/canvas-migration/checks
+    drupal_root: web
+    baseline_count: "0"
+- id: cm09_parity_filtered
+  input: |
+    Compare the element inventory of the archived source capture against the
+    built page, with the known-noise allowlist applied.
+  criteria: >
+    Zero unexplained missing elements. element-inventory.js always exits 0 in
+    diff mode - the result is only in stdout, so the wrapper parses it,
+    strips allowlisted noise (cookie banner, GTM iframe, cart link, the
+    %28-encoding image renames, animation/carousel classes), and fails on
+    anything left. Parity MUST run against the archived file:// snapshot,
+    never the live site.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm09_parity_filtered@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: parity
+    checks_dir: evals/canvas-migration/checks
+    pipeline_dir: website-to-components
+    source_url: "file:///var/www/html/website-to-components/output/freelygive.io/source-snapshot/index.html"
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    allowlist: evals/canvas-migration/harness/noise-allowlist.txt
+    snapshot_note: >
+      The file:// snapshot is CREATED BY THE RESET HARNESS at WS2 (archived
+      mirror of the mechanical capture); it does not exist yet. The wrapper
+      hard-fails on non-file:// sources (ABP_PARITY_ALLOW_LIVE=1 escape for
+      ungraded calibration only) - run-0 shipped the live URL here and both
+      adversarial reviewers caught the contradiction.
+    advisory_pixel: "per-section pixelmatch ratios are run artifacts, never a gate (confirmed brittle)"
+    seeded_by: "run-0 calibration findings 2, 3, 5"
+- id: cm10_hero_variants
+  input: |
+    Check that all rotating hero headline variants from the source made it
+    into the migrated story source.
+  criteria: >
+    Every headline variant of the rotating hero exists somewhere in the
+    workspace src/ (story data or component). The source renders variants as
+    alternating DOM nodes; a build that keeps only the first variant has
+    dropped content. Greps the story SOURCE, not the rendered DOM, so
+    animation timing cannot mask the check.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm10_hero_variants@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: parity
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    content_scope: storybook/src/stories
+    expected_strings: "Full Stack CRM with AI solutions|Improving your CRM with|Artificial Intelligence"
+    note: >
+      Run-0 verdict: PASSES against the story source (verified 2026-07-15 on
+      the archived run-1 workspace) - all variants are in the data; the
+      rendered-DOM parity misses were animation timing, not dropped content.
+      This is exactly why the check greps source: a DOM-based version would
+      have filed a false positive.
+    seeded_by: "run-0 calibration finding 4 (repeating-blocks class)"
+- id: cm11_testimonials_present
+  input: |
+    Check that every testimonial quote and attribution from the source made it
+    into the migrated story source.
+  criteria: >
+    Both quotes and both attributions exist in the workspace src/. Greps the
+    story SOURCE because testimonial carousels render one slide at a time -
+    the rendered DOM legitimately shows only the active slide (known noise),
+    but the story data must carry all of them.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm11_testimonials_present@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: parity
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    content_scope: storybook/src/stories
+    expected_strings: "capturing and scoring what something means|James Abrahams|excellent partner|Lesley Stewart"
+    seeded_by: "run-0 calibration finding 4 + fg-content-mapping class"
+- id: cm13_press_caption_present
+  input: |
+    Check that the press/video block's title text from the source made it
+    into the migrated story source.
+  criteria: >
+    The "AI module to power websites for Starshot" title exists in the
+    workspace src/. The source renders it as a heading, the build as a video
+    caption - a legitimate render shift, which is why the rendered-DOM
+    parity check allowlists it and THIS check enforces the content. The
+    grep string deliberately avoids the apostrophe: source DOM uses a
+    typographic quote, the story source a straight one.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm13_press_caption_present@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: parity
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    content_scope: storybook/src/stories
+    expected_strings: "AI module to power websites for Starshot"
+    seeded_by: "run-0 parity decomposition (render-shift class, 2026-07-15)"
+- id: cm12_screenshot_gate
+  input: |
+    Capture full-page screenshots of the built page (desktop and mobile
+    viewports) as scoreboard artifacts.
+  criteria: >
+    agent-browser produces a valid, non-trivial PNG for both viewports after
+    a scroll-through (lazy-loaded images must trigger before capture). A
+    failed capture is a blocking infra failure, not a skipped advisory -
+    without the artifact the run is not reviewable.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm12_screenshot_gate@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: gate
+    checks_dir: evals/canvas-migration/checks
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    artifact_dir: screenshots
+    seeded_by: "run-0 capture-protocol false positive (lazy-loaded cards)"
+- id: cm14_container_width
+  input: |
+    Verify the built page constrains its content column to the source site's
+    max-width at the pinned desktop viewport.
+  criteria: >
+    The content column at the "Our CRM Solutions" landmark measures the
+    source's 1280px (+/- tolerance) at 1440x900. Run-1 build measured 550px
+    (heading floats in a full-bleed 1425px section) - the expert-review miss
+    this case reproduces. Computed geometry, not pixels: the fact comes from
+    getBoundingClientRect on the landmark's ancestor chain.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm14_container_width@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: container_max_width
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review 2026-07-15, finding 1"
+- id: cm15_video_stagger
+  input: |
+    Verify the video blocks reproduce the source's uneven (staggered)
+    placement instead of an evenly-aligned row.
+  criteria: >
+    The top-y spread of the three video blocks is at least 40px (source
+    staggers them 647/724/801, spread 154px). Video blocks include
+    thumbnail-link embeds, not just iframes - the run-1 build renders
+    YouTube thumbs in one even row (spread 0), the expert-review miss this
+    case reproduces.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm15_video_stagger@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: video_stagger
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review 2026-07-15, finding 2"
+- id: cm16_crm_two_col
+  input: |
+    Verify the product images below "Our CRM Solutions" render in the
+    source's two-column layout.
+  criteria: >
+    The first image row below the landmark heading has exactly 2 columns
+    (source: phone mock at x=180, laptop mock at x=664, one row). The run-1
+    build stacks them in a single centered column - the expert-review miss
+    this case reproduces.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm16_crm_two_col@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: crm_two_col
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review 2026-07-15, finding 3"
+- id: cm17_underline_accent
+  input: |
+    Verify the caption underline ACCENT from the source is reproduced, not
+    replaced by a default link underline.
+  criteria: >
+    Each caption landmark present on the page carries a decorative underline
+    mechanism from the spec's accept_mechanisms (adjacent shape / border /
+    background). The source paints brush-stroke SVGs; the run-1 build has
+    only plain text-decoration, which the expert verdict counts as a miss -
+    so text-decoration is deliberately NOT accepted.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm17_underline_accent@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: underline_accent
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review 2026-07-15, finding 4"
+- id: cm18_section_dividers
+  input: |
+    Verify the built page has the source's full-width shaped section
+    dividers (curved/angled band boundaries).
+  criteria: >
+    At least 2 full-width shaped divider regions exist (clip-path or SVG
+    shapes clustered by position; source has exactly 2). Guards the
+    dropped-dividers regression class. NOTE: the run-1 build PASSES this
+    count fact (2 angled polygon dividers) while the expert review of the
+    run-0 screenshots called dividers missing - either run-0 lacked them or
+    the finding is about position/shape, not presence; flagged for expert
+    re-review before tightening the spec.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm18_section_dividers@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: section_dividers
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review 2026-07-15, finding 5"
+- id: cm19_no_horizontal_overflow
+  input: |
+    Verify the built page does not scroll horizontally at the pinned mobile
+    viewport.
+  criteria: >
+    document scrollWidth <= viewport width (+2px slack) at 390x844. Run-0's
+    video block (w-full inside mx-6) overflows to 399px and paints a white
+    stripe down the entire site. Universal invariant - fails loudly on
+    short/unrendered pages via min_page_height.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm19_no_horizontal_overflow@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: mobile_no_overflow
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), video overflow / white stripe"
+- id: cm20_header_row_layout
+  input: |
+    Verify the mobile header is a two-column row: logo left, menu control
+    right.
+  criteria: >
+    Logo and menu control share a row (center-y within 25px), control right
+    of logo, logo left-aligned (center < 35% viewport). Run-0 centers the
+    logo and pushes the burger below it.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm20_header_row_layout@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: mobile_header_row
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), header layout"
+- id: cm21_hero_text_style
+  input: |
+    Verify the hero heading's typography matches the source: font weight and
+    line-height ratio.
+  criteria: >
+    Weight 400 and line-height ratio 1.0 (+/-0.15) as on source; run-0
+    renders weight 700 at ratio ~1.2. Font family and size are advisory
+    facts, deliberately not gated (a deliberate font substitution should not
+    fail the eval; weight/leading drift should). Seed case for the broader
+    "typography has quite a few misses" class - more text_style instances
+    can be added per landmark.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm21_hero_text_style@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: mobile_hero_text_style
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), hero typography"
+- id: cm22_accent_text_color
+  input: |
+    Verify the footer "Happy to help" text keeps the source's brand-yellow
+    color.
+  criteria: >
+    Computed color equals the source's rgb(242, 203, 7); run-0 renders it
+    white. Exact computed-color compare on a text landmark.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm22_accent_text_color@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: footer_accent_color
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), footer color"
+- id: cm23_cards_row_pattern
+  input: |
+    Verify the AI/Talks/Work cards keep the source's mobile row pattern.
+  criteria: >
+    The three card labels cluster into rows [2,1] (AI+Talks share a row,
+    Work centered below) at 390x844, as on source; run-0 stacks them
+    [1,1,1].
+  bundle: canvas_migration
+  rubric_ref: rubric/cm23_cards_row_pattern@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: mobile_cards_row_pattern
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), cards 1-col collapse"
+- id: cm24_clients_grid_pattern
+  input: |
+    Verify the client logos keep the source's mobile grid pattern and size.
+  criteria: >
+    Logo grid below "Our Clients" clusters into rows [2,2,1] with images
+    >= 100px wide, as on source (116-243px); run-0 stacks them
+    single-column at 96px - both the pattern and the size regressed.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm24_clients_grid_pattern@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: mobile_clients_grid
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), clients grid + logo size"
+- id: cm25_footer_copyright_last
+  input: |
+    Verify the copyright line is the footer's last block, as on source.
+  criteria: >
+    The copyright sits below every contact and social link and within 300px
+    of the page end; run-0 parks it mid-footer right under the logo, above
+    contact and social.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm25_footer_copyright_last@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: footer_copyright_last
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), footer order"
+- id: cm26_social_icons_position
+  input: |
+    Verify the social icons sit beside the contact details, as on source.
+  criteria: >
+    Social links render to the right of the contact block (min x past the
+    contact right edge) within the same y-band; run-0 stacks them below at
+    the left margin.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm26_social_icons_position@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: footer_social_beside_contact
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "expert screenshot review pass 2 (2026-07-17), social icons placement"
+- id: cm27_collection_props_slots
+  input: |
+    Verify repeating collections are built to Andrew's carousel pattern:
+    items exposed as props/slots so end users can edit them in Canvas.
+  criteria: >
+    The component owning the client-logo collection (landmarks: "Enders
+    Analysis", "National Criminal Justice") either declares a slot or
+    array-typed prop (open collection, the pristine brand_carousel shape),
+    or is an item component repeated in editable page composition. Run-3
+    built fre_client_logo_grid with TEN enumerated scalar props
+    (logo1Src..logo5Alt) - a fixed shape nobody can extend without code,
+    exactly the AI-OOB failure Jamie named (07-17). Doubles as the
+    skills-on vs skills-off comparison case for Phase 2.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm27_collection_props_slots@1.2
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: pattern
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    collection_landmarks: "Enders Analysis,National Criminal Justice"
+    seeded_by: "Jamie's carousel spec (Slack 2026-07-17) + run-3 fre_client_logo_grid"
+- id: cm28_canvas_page_served
+  input: |
+    Verify the CMS actually serves the migrated homepage as a page - the
+    destination render, not the Storybook preview.
+  criteria: >
+    Some single page the Drupal site serves over HTTP (front page, any
+    canvas_page or node alias) contains ALL the source homepage landmarks
+    (hero heading + "Our CRM Solutions"; multi-landmark after the
+    adversarial review - one planted phrase cannot pass), matched on
+    tag-stripped text or, for client-side-hydrated Canvas pages, on the
+    hydration props in the raw body (visible rendering of the same
+    landmarks is cm30/cm31's geometry probes, which anchor on this text
+    in a real browser). Run-3 pushed 34 components with exit 0 yet the front page
+    still serves the starter kit's "Your hero content goes here" - the
+    migration never reached the destination as a page. The pipeline has a
+    pages path (canvas:pages:build + canvas:pages:local) that the migration
+    flow never invokes. Storybook is not the destination (R3).
+  bundle: canvas_migration
+  rubric_ref: rubric/cm28_canvas_page_served@1.2
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: deploy
+    checks_dir: evals/canvas-migration/checks
+    drupal_root: web
+    page_landmarks: "Improving your CRM,Our CRM Solutions"
+    seeded_by: "canvas-render gap analysis 2026-07-17 (run-3 destination inspection)"
+- id: cm29_canvas_css_served
+  input: |
+    Verify the global Canvas asset library CSS is non-empty in config AND
+    actually served over HTTP after the push.
+  criteria: >
+    The asset_library 'global' config entity holds non-empty css.compiled,
+    and the generated file that hook_library_info_build() puts on real
+    pages returns HTTP 200 with a non-empty body. Two live failure classes
+    with the workspace's pinned CLI 0.19.0: push clobbers css.compiled to
+    '' (#3591750 fixed only in CLI 0.20.x; server variant #3591751 open),
+    and stale/missing generated files while config looks fine (#3591075) -
+    hence the check asserts on the SERVED asset, never config alone.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm29_canvas_css_served@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: deploy
+    checks_dir: evals/canvas-migration/checks
+    drupal_root: web
+    asset_library: global
+    seeded_by: "Canvas upstream research 2026-07-17 (#3591750/#3591751/#3591075) + push.sh's own re-upload workaround"
+- id: cm30_canvas_container_width
+  input: |
+    Verify the content column width on the DRUPAL-RENDERED page, not the
+    Storybook preview (cm14's assertion at the true destination).
+  criteria: >
+    Same computed-geometry fact as cm14 (content column 1280px +/-60 at
+    1440x900 at the "Our CRM Solutions" landmark), measured on the page the
+    CMS serves. Fails while no migrated page is deployed (landmark absent
+    from the starter front page) and keeps grading layout fidelity once the
+    pages path lands the homepage.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm30_canvas_container_width@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: canvas_render
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: container_max_width
+    built_url: "https://fg-canvas-eval.ddev.site/"
+    seeded_by: "canvas-render gap analysis 2026-07-17; mirrors cm14"
+- id: cm31_canvas_crm_two_col
+  input: |
+    Verify the CRM section's two-column layout on the DRUPAL-RENDERED page
+    (cm16's assertion at the true destination).
+  criteria: >
+    Same computed-geometry fact as cm16, measured on the page the CMS
+    serves. Fails while no migrated page is deployed and keeps grading
+    layout fidelity once the pages path lands the homepage.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm31_canvas_crm_two_col@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: canvas_render
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/layout-spec.json
+    assertion: crm_two_col
+    built_url: "https://fg-canvas-eval.ddev.site/"
+    seeded_by: "canvas-render gap analysis 2026-07-17; mirrors cm16"
+- id: cm32_nav_link_integrity
+  input: |
+    Verify site navigation on the built page actually goes somewhere: every
+    source nav destination exists and no anchor is a '#' placeholder.
+  criteria: >
+    ADVISORY under homepage-only scope: the source nav pairs (About us ->
+    /about, Subscriptions, Our CRM, Jobs, Contact us, Blog, Services, AI ->
+    /artificial-intelligence) all target OTHER pages that a homepage-only
+    migration never builds, so an unresolved or dead nav link there is
+    honest, not a defect. The check reports whether the source's link
+    structure was carried (a parity signal for a future full-site
+    migration) but does not fail the run on it. Only scope-independent link
+    facts hard-fail (see cm33). Seeded by the run-3 cm09 decomposition;
+    made scope-aware 2026-08-11 (link-spec 1.2).
+  bundle: canvas_migration
+  rubric_ref: rubric/cm32_nav_link_integrity@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: links
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/link-spec.json
+    link_case: nav_link_integrity
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "run-3 cm09 decomposition 2026-07-17: dead navigation"
+- id: cm33_social_links_exact
+  input: |
+    Verify social links are the SOURCE's, byte-exact - no invented handles.
+  criteria: >
+    An anchor links twitter.com/freelygiveltd and youtube.com/@FreelyGive;
+    no anchor matches twitter.com/freelygive without the ltd suffix. Run-3
+    rewrote the Twitter handle to twitter.com/freelygive - an invented
+    handle pointing at someone else's account, caught deterministically by
+    a lookahead pattern. Seeded by the run-3 cm09 decomposition.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm33_social_links_exact@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: links
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/link-spec.json
+    link_case: social_links_exact
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "run-3 cm09 decomposition 2026-07-17: freelygiveltd -> freelygive rewrite"
+- id: cm34_work_tiles_linked
+  input: |
+    Verify the work case-study tiles link to their case studies.
+  criteria: >
+    ADVISORY under homepage-only scope: the work tiles link to /work/<slug>
+    case-study DETAIL pages that a homepage-only migration never builds, so
+    missing or unlinked tiles are honest, not a defect. The check reports
+    whether at least 3 tile links were carried (source has 5) but does not
+    fail the run on it. Seeded by the run-3 cm09 decomposition; made
+    scope-aware 2026-08-11 (link-spec 1.2).
+  bundle: canvas_migration
+  rubric_ref: rubric/cm34_work_tiles_linked@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: links
+    checks_dir: evals/canvas-migration/checks
+    spec: evals/canvas-migration/harness/link-spec.json
+    link_case: work_tiles_linked
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "run-3 cm09 decomposition 2026-07-17: unlinked work tiles"
+- id: cm35_broken_images
+  input: |
+    Verify every image the built page renders actually loads.
+  criteria: >
+    Zero visible images with a failed load or 0x0 natural size (404 src,
+    collapsed lazy-load, wrong path). Run-0 shipped logos collapsed to
+    0x0 by a lazy-load bug. Content-hash parity was rejected: the
+    pipeline legitimately recompresses and resizes (run-3's renamed
+    copies are not byte-identical), so loads-correctly is the honest
+    deterministic image fact.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm35_broken_images@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: render_quality
+    checks_dir: evals/canvas-migration/checks
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    seeded_by: "run-0 lazy-load bug + image-hash investigation 2026-07-17"
+# cm36_a11y_parity RETIRED 2026-08-11 (was: skip link + alt-text parity).
+# It measured the Storybook iframe - a component render with no site
+# chrome - so the skip-link half asserted a THEME/platform affordance on a
+# surface that structurally cannot carry one, false-failing every board
+# incl. all local arms. Verified on the source arm's served Drupal page:
+# Drupal core ships `<a href="#main-content" class="visually-hidden
+# focusable">Skip to main content</a>`, so the skip link is present (and is
+# the platform's job, not the migration's). Its VALID half (alt-text
+# parity) lives on as cm41 below, re-pointed source<->served-page.
+# Definition preserved in git history for reference.
+- id: cm41_alt_text_parity
+  input: |
+    Verify image alt text survives the migration: every meaningful alt on
+    the source homepage is present on the SERVED migrated page.
+  criteria: >
+    Compares the live source against the served CMS/Canvas page, not the
+    Storybook story. Parity, never improvement: filename-shaped source alts
+    (e.g. "logo.png") are junk the source itself carries and are not
+    required. Skip links are not graded - Drupal core provides one, it is
+    not migration output (why cm36 retired).
+  bundle: canvas_migration
+  rubric_ref: rubric/cm41_alt_text_parity@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: render_quality
+    checks_dir: evals/canvas-migration/checks
+    built_url: "https://fg-canvas-eval.ddev.site/"
+    alt_source_url: "https://freelygive.io/"
+    seeded_by: "cm36 retirement 2026-08-11 - the alt-text half, re-pointed source<->served page"
+- id: cm37_menu_opens
+  input: |
+    Verify the mobile navigation actually works ON THE DESTINATION PAGE:
+    at 390x844 a visible menu control exists and using it reveals the
+    navigation.
+  criteria: >
+    Clicking the visible header/menu button makes an "About" nav anchor
+    visible (or nav is already visible), on the page the CMS actually
+    serves. Behavior fact, distinct from cm32's link-target fact. Graded
+    on the destination, not a kit's build preview: build planes may omit
+    global regions by construction (measured - a standalone page preview
+    can render no header at all while the served page's Toggle navigation
+    button opens the full nine-item nav), so a preview verdict would
+    grade the preview format, not the migration. The frozen
+    source snapshot cannot calibrate this (its boot JS is dead on file:).
+  bundle: canvas_migration
+  rubric_ref: rubric/cm37_menu_opens@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: render_quality
+    checks_dir: evals/canvas-migration/checks
+    built_url: "https://fg-canvas-eval.ddev.site/"
+    nav_landmark: "About"
+    seeded_by: "expert mobile review pass (11 of 16 findings mobile) 2026-07-17"
+- id: cm38_secrets_clean
+  input: |
+    Verify no workspace credentials leaked into anything the migration
+    built (stories, components, pages, public assets, scripts).
+  criteria: >
+    No credential-like .env value (SECRET, TOKEN, KEY, PASSWORD,
+    CLIENT_ID) appears in src/, pages/, public/ or scripts/. The agentic
+    run legitimately reads .env for the push; copying a value into build
+    output would ship OAuth credentials to the client repo and CDN. The
+    check names the variable, never the value.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm38_secrets_clean@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: render_quality
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    seeded_by: "adversarial review follow-through 2026-07-17"
+- id: cm39_video_ids
+  input: |
+    Verify the videos the build embeds are the SAME videos the source
+    embeds, by their YouTube ids, not just that a video-shaped card
+    renders.
+  criteria: >
+    The set of YouTube ids on the built freelygive-home page equals the
+    set the source homepage embeds (99amnw4xk5c, LjdAsguNwJQ,
+    RUI66lKljdE, from the crawl's site-resources.json and frozen
+    source-snapshot). A wrong-but-present video renders identically to
+    the right one, so cm15's layout check and every screenshot check pass
+    a card pointing at the wrong id; run-3's agent asserted "real video
+    ids confirmed from live DOM" with nothing verifying it. This check is
+    the verifier: it fails a wrong id, a hallucinated id, and a dropped
+    video alike. Ids are public identifiers, not secrets.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm39_video_ids@1.1
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: render_quality
+    checks_dir: evals/canvas-migration/checks
+    workspace: storybook
+    pages_rel: src/stories/pages
+    source_video_ids: "99amnw4xk5c,LjdAsguNwJQ,RUI66lKljdE"
+    seeded_by: "transcript claim-vs-evidence scan 2026-07-18 (doc 13): run-3 claimed live-DOM video ids, unverified"
+    note: >
+      pages_rel is a directory (2026-07-20): the page story filename and the
+      embed prop are both agent-chosen (run-3: FreelygiveHome.stories.tsx +
+      videoId=; isolated run: FreelyGiveHome.stories.tsx + videoUrl=). The
+      check scans all page stories and accepts videoId props or YouTube URL
+      forms; the oracle (id-set equality with the source) is unchanged.
+- id: cm40_geometry_fidelity
+  input: |
+    Verify the built page reproduces the source's measured geometry -
+    section heights, widths and order, anchor typography (font-size,
+    weight, color) and top-to-bottom content order - against a spec
+    auto-extracted from the source at grade time.
+  criteria: >
+    geometry-probe.sh exits 0 under the two-tier rule (rubric 1.2): every
+    STRUCTURAL gate in the source-extracted spec (section heights, widths,
+    order, anchor content-flow order) holds on the built page at the pinned
+    viewport, and STYLE gates (anchor font-size/weight/color) hold at >= 90%
+    - thresholded because an auto-extracted spec carries tolerance quirks a
+    hand-calibrated one does not, so one stray font-weight must not sink 60
+    holding assertions; style misses above the threshold remain visible
+    findings in the run artifacts. Unlike cm14-cm18
+    (hand-calibrated single facts), the spec here is generated per run by
+    text-twin pairing: expected values are measured on the SOURCE render,
+    selectors resolved on the BUILT DOM, so the check survives DOM churn
+    between kits and needs no recalibration. Coverage minimums (paired
+    sections/anchors) plus a 60% pairing-ratio gate over the source's
+    gradeable anchors close the vacuous-pass hole - a build sharing too
+    little text with the source FAILS as a migration finding. The
+    extraction map's skip list doubles as a missing-content report (it
+    surfaced the 6 missing nav links, cm32's family, on the 2026-08-11
+    calibration run). Probe INFRA exits 2 and is reported as harness
+    breakage, never a design verdict.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm40_geometry_fidelity@1.2
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: geometry
+    checks_dir: evals/canvas-migration/checks
+    geom_source_url: "https://freelygive.io/"
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    component: pages-home
+    geom_viewport: 1280x900
+    seeded_by: "geom-probe calibration vs migrated story 2026-08-11; extends the cm14-cm18 parity family"
+    note: >
+      Extraction currently measures the LIVE source (same caveat the
+      1.0-live-calibration layout-spec carried); switching geom_source_url
+      to the frozen file:// snapshot needs a host-visible path - the
+      state.json source_url is container-absolute, hence the distinct key
+      name so injection cannot overwrite this with a path the host sandbox
+      cannot open. Requires node + playwright-core + chromium on the host
+      (GEOM_PROBE_DIR, default ~/projects/geom-probe); artifacts (extracted
+      spec + map, score/observed JSON, screenshot, verdict overlay PNG)
+      land in the run dir under geom/.
+
+- id: cm42_image_parity
+  input: |
+    Verify the built page renders the source's images - every visible
+    <img> and inline <svg> present (paired by decoded filename, or by
+    accessible name / path fingerprint for inline SVGs) and rendered at
+    comparable sizes at the pinned viewport.
+  criteria: >
+    image-parity.sh exits 0: every visible source image has a twin on the
+    built page and each paired image's rendered box is within 20% (min
+    8px) of the source's on both axes. Extra build-side images are
+    reported, never gated; CSS background images are out of scope. Parity
+    is to the source AS RENDERED, quirks included - a logo the source
+    draws huge must render huge on the build; deliberate improvements
+    belong in an explicit allowlist when one earns its place. Seeded by
+    the 2026-08-12 calibration: source rendered 30 images to the build's
+    23 - 13 missing (both footer social icons plus all of FG's decorative
+    squiggle SVGs, the hand-drawn heading underlines and section
+    scribbles) and 11 size drifts (FG monogram 306x102 -> 191x64, the
+    Journeycall phone image at half size, every client logo re-boxed).
+    INFRA exit 2 is harness breakage, never a design verdict.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm42_image_parity@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: images
+    checks_dir: evals/canvas-migration/checks
+    geom_source_url: "https://freelygive.io/"
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    component: pages-home
+    geom_viewport: 1280x900
+    seeded_by: "image-parity calibration vs migrated story 2026-08-12; fills the rendered-image gap the cm40 text-only extractor cannot see"
+    note: >
+      Same live-source caveat and host toolchain as cm40 (node +
+      playwright-core + chromium via GEOM_PROBE_DIR); the pairing report
+      lands in the run dir under images/.
+- id: cm43_image_parity_served
+  input: |
+    Verify the SERVED Drupal page renders the source's images - the same
+    presence and rendered-size parity as cm42, measured on the page the
+    client actually sees, where Drupal image styles apply.
+  criteria: >
+    image-parity.sh exits 0 against the served page: every visible source
+    image has a twin rendered within 20% (min 8px) on both axes. The
+    served plane is where migration-baked image-style derivatives bite -
+    cm42's storybook measurement found the build's image FILES are
+    thumbnails (client logos natural 31x20 stretched to 200x133, the FG
+    monogram 40x13 drawn at 191x64), damage invisible to any DOM check
+    and fully outside the storybook CSS story. Three guards keep the
+    verdict honest: the site consumer's token is attached for SSO-walled
+    served origins (source arm) via a mode-0600 header file scoped to
+    that origin only; a sentinel ("Skip to main content", which Drupal
+    core ships on every rendered page) distinguishes the graded page from
+    an HTTP-200 auth wall - sentinel absent is INFRA, never "all images
+    missing" (measured on the Okta wall 2026-08-12: 0 paired / 30
+    missing / 1 extra, a lie); and <img> keys pair on the original
+    filename embedded in Drupal's /styles/<style>/public/ derivative
+    paths (trailing .webp/.avif stripped), so an honestly styled
+    foo.png.webp still twins with the source's foo.png. INFRA exit 2 is
+    harness breakage, never a design verdict.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm43_image_parity_served@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: images
+    checks_dir: evals/canvas-migration/checks
+    geom_source_url: "https://freelygive.io/"
+    built_url: "https://fg-canvas-eval.ddev.site/"
+    component: served-home
+    geom_viewport: 1280x900
+    served_sentinel: "Skip to main content"
+    seeded_by: "cm42 thumbnail-derivative finding + Okta-wall false-FAIL measurement 2026-08-12"
+    note: >
+      built_url sits on the canonical Drupal host so the bed profile
+      projects it to the bed's own served page (local arm) or the PUBLIC
+      served host of the remote site (source arm, ABP_SERVED_ORIGIN via
+      the shield cookie - never the consumer-auth host, whose page view
+      is the Acquia Source editor shell), exactly like cm28/cm41. The
+      sentinel is a platform affordance, deliberately NOT migration
+      output: a badly migrated page must still FAIL on its images, not
+      dodge into INFRA because its own content is too broken to find.
+- id: cm44_seo_parity
+  input: |
+    Verify the source page's SEO surface survives on the SERVED page -
+    title, meta description, canonical, robots, and og:/twitter: social
+    tags, read from server HTML, the plane crawlers and share cards see.
+  criteria: >
+    seo-parity.sh exits 0: the served title is non-empty and carries the
+    source's distinctive token (a placeholder "Home | New Site" fails);
+    the source's meta description survives verbatim (whitespace-normalized,
+    the same survival rule as cm41's alt text); the canonical is absolute
+    and on the SERVED origin (value parity with the source would misdirect
+    crawlers at the old site, so this gate is correctness-shaped); the
+    migration does not introduce noindex/nofollow on an indexable source;
+    and every og:/twitter: property the source carries exists non-empty on
+    the served page (values may differ - og:url legitimately changes
+    origin; og:image:width/height are excluded as derivatives of
+    og:image). Server HTML only - a tag that appears after JS hydration is
+    invisible to most crawlers and deliberately does not count. Adopted
+    from an external buildkit's SEO gate, re-based as source-vs-served
+    parity graded by the external referee. Same served-plane guards as
+    cm43: site-consumer auth via a mode-0600 header file on SSO-walled
+    arms, and the Drupal-core sentinel so an HTTP-200 auth wall (which
+    carries no SEO tags) grades INFRA, never a design verdict. First
+    calibration 2026-08-12: 1/5 gates hold - placeholder title, rewritten
+    description, relative canonical, all 11 social properties missing;
+    only robots survives.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm44_seo_parity@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: render_quality
+    checks_dir: evals/canvas-migration/checks
+    seo_source_url: "https://freelygive.io/"
+    built_url: "https://fg-canvas-eval.ddev.site/"
+    component: served-home
+    served_sentinel: "Skip to main content"
+    seo_title_token: "FreelyGive"
+    seeded_by: "external buildkit comparison - SEO coverage gap"
+    note: >
+      built_url sits on the canonical Drupal host so the bed profile
+      projects it to the served plane per arm (source arm: the public
+      shielded host, like cm43). The artifact (both pages' extracted tags
+      + per-gate verdicts) lands in the run dir under seo/.
+- id: cm45_content_centered
+  input: |
+    Verify the built page's width-capped content columns are horizontally
+    centered at a wide viewport, where max-width caps actually bind.
+  criteria: >
+    center-parity.sh exits 0 on the built story at 1920x1080: every
+    rendered element whose computed max-width is an absolute px cap that
+    binds, and which spans at least half the layout viewport, has left and
+    right gaps symmetric within 24px (one spacing unit; the systematic
+    headless-scrollbar skew measures 16px on truly centered columns, and
+    the source's own content column measures dead-center 320/320).
+    Deliberately generic - the probe derives columns from computed style,
+    no selectors or component names, so kit restyles and target changes
+    need no recalibration. Seeded by the m-auto/mx-6 class-order bomb: both
+    classes set the same margins, CSS emission order decides the winner,
+    and margin-inline silently kills margin:auto - hero, videos, tiles and
+    clients columns snap left in any context without a centering ancestor,
+    at every viewport wider than the cap. All pinned viewports before this
+    case were <= 1440, where a 1360px cap barely binds, so no existing
+    check could see it. Gates the rendered fact, so it fails whichever way
+    the defect arrives (class order, missing --spacing, dropped wrapper).
+    A page with no capped columns is INFRA, never a verdict.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm45_content_centered@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    built_url: "https://storybook.fg-canvas-eval.ddev.site/iframe.html?id=pages-freelygive-home--default&viewMode=story"
+    component: pages-home
+    center_viewport: 1920x1080
+    seeded_by: "m-auto/mx-6 class-order finding; source column measures 320/320 at 1920"
+- id: cm46_content_centered_served
+  input: |
+    Verify the SERVED page's width-capped content columns are centered at
+    a wide viewport - the same fact as cm45, on the page the client sees.
+  criteria: >
+    center-parity.sh exits 0 against the served page at 1920x1080, same
+    generic derivation and 24px symmetry rule as cm45, with the served-
+    plane guards (origin-scoped shield-cookie auth on the public host,
+    Drupal-core sentinel; a wall renders no capped columns and grades
+    INFRA either way). Measured on the PUBLIC served page (the shielded
+    friendly host - never the consumer-auth host, whose page view is the
+    Acquia Source editor shell and whose 264px sidebar inverted the first
+    calibration): all four m-auto/mx-6 content sections (hero, videos,
+    tiles, clients) sit 24 vs 536 at 1920 - snapped left, 512px
+    off-center - while the footer (mx-auto max-w-screen-xl) centers
+    at 320/320.
+  bundle: canvas_migration
+  rubric_ref: rubric/cm46_content_centered_served@1.0
+  metadata:
+    run_group: fg-homepage-e2e
+    stage: layout
+    checks_dir: evals/canvas-migration/checks
+    built_url: "https://fg-canvas-eval.ddev.site/"
+    component: served-home
+    center_viewport: 1920x1080
+    served_sentinel: "Skip to main content"
+    seeded_by: "cm45 calibration on the served plane; editor-shell inversion caught during calibration (true page: 4 sections 24/536, footer 320/320)"

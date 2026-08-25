@@ -35,6 +35,24 @@ bash <(curl -fsSL https://project.pages.drupalcode.org/one_line_installer/drupal
   --config-url /absolute/path/to/nebula-oli --config nebula
 ```
 
+## Install with the migration evals
+
+```bash
+bash <(curl -fsSL https://project.pages.drupalcode.org/one_line_installer/drupalaibp) \
+  https://github.com/ivanboring/nebula-oli --config nebula-evals
+```
+
+Everything the `nebula` config does, plus the canvas-migration eval harness
+from [`drupal/ai_best_practices`](https://www.drupal.org/project/ai_best_practices)
+in an isolated `abp-eval` DDEV service: `ddev eval list` / `grade` / `view` /
+`web`. The eval set is the same freelygive.io homepage migration the
+[canvas-storybook-ai](https://gitlab.com/freelygive/canvas-storybook-ai) kit
+grades, so the two kits are compared on identical cases. A fresh install is
+**not armed**: grading and the paid migration run need the operator handover
+(site credentials + baseline) - see `.drupalaibp/evals/NEBULA-ARM.md` in the
+installed project, or [`.drupalaibp/evals/README.md`](.drupalaibp/evals/README.md)
+here.
+
 ## What you get
 
 - **Nebula, fetched from upstream at install time** (`git clone --depth 1` of

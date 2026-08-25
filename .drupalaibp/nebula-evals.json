@@ -1,0 +1,30 @@
+{
+  "label": "Nebula in DDEV + Migration Evals",
+  "weight": 3,
+  "ddev_project_type": "php",
+  "is_drupal": false,
+  "launch_path": ":5173",
+  "agents": ["claude"],
+  "deny_commands": ["git push", "ssh"],
+  "agents_md": [
+    "This install carries a migration-grading harness that runs in an isolated `abp-eval` service. The `.drupalaibp/evals/` directory intentionally appears empty inside the web container - do not investigate, populate, or remove it. Operators grade from the host with `ddev eval grade`."
+  ],
+  "hooks": {
+    "ddev_started": [
+      { "script": "./fetch-nebula.sh", "weight": 3, "where": "web" },
+      { "script": "./reinit-git.sh", "weight": 5, "where": "web" },
+      { "script": "./install-deps.sh", "weight": 9, "where": "web" }
+    ],
+    "before_announce_complete": [
+      { "script": "./hosted-canvas-setup.sh", "weight": 10, "where": "host" },
+      { "script": "./setup-evals.sh", "weight": 20, "where": "host" },
+      { "script": "./finalize-evals.sh", "weight": 30, "where": "web" }
+    ]
+  },
+  "append_welcome_text": [
+    "{BOLD}Canvas Workbench{RESET} is running at {GREEN}{SITE_URL}:5173{RESET}",
+    "Connect to a Drupal Canvas site (e.g. Acquia Source) with {BOLD}ddev canvas-setup{RESET} — or skip it and add the data later. {BOLD}npx canvas validate{RESET} / {BOLD}npx canvas push{RESET} then work against it.",
+    "Handy: {BOLD}ddev npm run dev{RESET} (Workbench), {BOLD}ddev workbench-restart{RESET}, {BOLD}ddev npm run code:check{RESET}, {BOLD}ddev claude{RESET}.",
+    "{BOLD}Evals{RESET} are installed: {BOLD}ddev eval list{RESET} shows the cases; arming and the graded run need the operator handover - see .drupalaibp/evals/NEBULA-ARM.md."
+  ]
+}

@@ -1,0 +1,43 @@
+# Noise allowlist for parity-filtered.sh - one extended regex per line,
+# matched against element-inventory "missing in build" bullet lines.
+# Every pattern carries the reason it is noise. Calibrated on run-0
+# (freelygive.io homepage, 2026-07-15); version this file in the run
+# manifest - a changed allowlist changes scores.
+#
+# Source-side noise: elements that must NEVER be migrated.
+cookies?
+googletagmanager
+GTM-
+-> /cart
+#
+# The dev-server %28/%29 encoding bug forces the agent to rename affected
+# images; identical content lands under a new filename, and the
+# filename-keyed inventory counts it as missing (calibration finding 3).
+image\+%2[89]
+#
+# Squarespace CDN images whose content the agent re-hosted under a clean
+# name (verified content-identical on run-0; the flickr-style id below is
+# the third rename).
+53066362499_5412db4dc1_k
+#
+# Repeating-block counts differ by design: source lists all fe-block nodes,
+# the build renders semantic components. Counts are advisory, not missing
+# elements; inventory bullet lines for them start with "source:" and are
+# not matched by the missing-section parser, so no pattern is needed.
+#
+# Animation/carousel/render-shift class: content VERIFIED PRESENT in the
+# run-1 story source (2026-07-15) but absent from the rendered DOM because
+# rotating heros animate, carousels render one slide, and the press heading
+# renders as a video caption. Allowlisted HERE because the rendered DOM
+# cannot show them; presence in the story source is ENFORCED by cm10, cm11
+# and cm13 - dropping this content still fails the eval, just in the right
+# case. Site-calibrated for freelygive.io; recalibrate per target site.
+Full Stack CRM with AI solutions
+that your users will love
+Improving your CRM with
+Artificial Intelligence
+capturing and scoring what something means
+James Abrahams
+excellent partner
+Lesley Stewart
+AI module to power websites

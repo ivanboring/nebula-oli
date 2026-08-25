@@ -1,0 +1,119 @@
+[
+  {
+    "_warning": "RUN-SPECIFIC transcription of run 20260720-175933's agent output (FreelygiveHome.stories.tsx, title 'Pages/FreelyGive — Homepage'). Component machine names, prop names and the /home alias are THAT agent's choices. Never replay against another run's workspace - publishing this against a different migration would make the serving-stage cases pass regardless of that run's own output. Regenerate from the new run's page story instead. Raw-JSX slot fills (footer logo/socialLinks/badges, the styled section wrapper div) are approximated with the agent's own image/brand_image components; the wrapper div has no component equivalent so its children are placed sequentially. Media target_ids 6-21 created per CM28-PUBLISH.md. (build-pages.mjs ignores underscore keys.)",
+    "title": "Home",
+    "alias": "/home",
+    "components": [
+      { "machine": "header", "ref": "hdr", "inputs": { "displaySearchForm": false } },
+      { "machine": "logo", "parentRef": "hdr", "slot": "logo", "inputs": {} },
+      { "machine": "main_navigation", "parentRef": "hdr", "slot": "menu", "inputs": {} },
+
+      { "machine": "hero", "ref": "hero",
+        "inputs": {
+          "layout": "Left aligned",
+          "headingElement": "h1",
+          "headingSize": "Large",
+          "heading": "Full Stack CRM with AI solutions that your users will love",
+          "textColor": "Light",
+          "accentColor": "#f0ca12",
+          "backgroundColor": "#1d2d39",
+          "dividerColor": "#2e485c"
+        } },
+      { "machine": "text", "parentRef": "hero", "slot": "rightColumn",
+        "inputs": {
+          "textColor": "Light",
+          "textSize": "Large",
+          "text": "We’re a team of Drupal Specialists, C# developers &amp; AI enthusiasts. <br>Delivering rapid user-focused solutions with a heart 💖<br>Adding AI to the mix to make all the difference."
+        } },
+
+      { "machine": "card_container", "ref": "cards_ai",
+        "inputs": {
+          "heading": "Improving your CRM with Artificial Intelligence",
+          "headingLevel": "h2",
+          "headingSize": "Extra Large",
+          "headingPosition": "Center aligned",
+          "textColor": "Light",
+          "accentColor": "#f0ca12",
+          "layout": "33-33-33"
+        } },
+      { "machine": "fg_youtube_embed", "parentRef": "cards_ai", "slot": "content",
+        "inputs": { "videoId": "RUI66lKljdE", "caption": "Drupal’s AI module to power websites for Starshot", "thumbnailAlt": "DrupalCon Singapore 2024 talk thumbnail" } },
+      { "machine": "fg_youtube_embed", "parentRef": "cards_ai", "slot": "content",
+        "inputs": { "videoId": "99amnw4xk5c", "caption": "Prompt Engineering Tips", "thumbnailAlt": "James Abrahams prompt engineering talk thumbnail" } },
+      { "machine": "fg_youtube_embed", "parentRef": "cards_ai", "slot": "content",
+        "inputs": { "videoId": "LjdAsguNwJQ", "caption": "Controlling Drupal via ChatGPT", "thumbnailAlt": "Controlling Drupal via ChatGPT talk thumbnail" } },
+
+      { "machine": "blockquote",
+        "inputs": {
+          "layout": "Centered",
+          "textColor": "Light",
+          "accentColor": "#f0ca12",
+          "introText": "When it comes to embeddings and vector search it’s simply…",
+          "text": "“A way of capturing and scoring what something means”",
+          "name": "James Abrahams, Director, FreelyGive"
+        } },
+
+      { "machine": "heading",
+        "inputs": { "heading": "Our CRM Solutions", "headingElement": "h2", "headingSize": "Extra Large", "layout": "Center aligned", "textColor": "Light", "accentColor": "#f0ca12" } },
+
+      { "machine": "grid_container", "ref": "grid_crm", "inputs": { "layout": "50-50" } },
+      { "machine": "image", "parentRef": "grid_crm", "slot": "content", "inputs": { "image": { "target_id": 6 } } },
+      { "machine": "image", "parentRef": "grid_crm", "slot": "content", "inputs": { "image": { "target_id": 7 } } },
+
+      { "machine": "blockquote",
+        "inputs": {
+          "layout": "Centered",
+          "textColor": "Light",
+          "accentColor": "#f0ca12",
+          "text": "“FreelyGive are an excellent partner – they not only deliver our requirements very efficiently and professionally, they also anticipate our needs and are pro-active in suggesting system improvements working both with us and our clients”",
+          "name": "Lesley Stewart, previous Business Development Director, Journeycall Ltd."
+        } },
+
+      { "machine": "grid_container", "ref": "grid_photos", "inputs": { "layout": "33-33-33" } },
+      { "machine": "fg_photo_tile", "parentRef": "grid_photos", "slot": "content",
+        "inputs": { "image": { "target_id": 8 }, "caption": "AI", "href": "/artificial-intelligence" } },
+      { "machine": "fg_photo_tile", "parentRef": "grid_photos", "slot": "content",
+        "inputs": { "image": { "target_id": 9 }, "caption": "Talks", "href": "/blog" } },
+      { "machine": "fg_photo_tile", "parentRef": "grid_photos", "slot": "content",
+        "inputs": { "image": { "target_id": 10 }, "caption": "Work", "href": "/services" } },
+
+      { "machine": "heading",
+        "inputs": { "heading": "Our Clients", "headingElement": "h2", "headingSize": "Extra Large", "layout": "Center aligned", "textColor": "Light", "accentColor": "#f0ca12" } },
+
+      { "machine": "fg_logo_wall", "ref": "wall", "inputs": {} },
+      { "machine": "brand_image", "parentRef": "wall", "slot": "logos",
+        "inputs": { "image": { "target_id": 11 }, "name": "Clinks", "link": "/work/clinks-online-directories-using-the-power-of-drupal-crm" } },
+      { "machine": "brand_image", "parentRef": "wall", "slot": "logos",
+        "inputs": { "image": { "target_id": 12 }, "name": "Enders Analysis", "link": "/work/enders-analysis-sugarcrm-migration-to-drupal-crm" } },
+      { "machine": "brand_image", "parentRef": "wall", "slot": "logos",
+        "inputs": { "image": { "target_id": 13 }, "name": "National Criminal Justice Arts Alliance", "link": "/work" } },
+      { "machine": "brand_image", "parentRef": "wall", "slot": "logos",
+        "inputs": { "image": { "target_id": 14 }, "name": "Peak Group", "link": "/work" } },
+      { "machine": "brand_image", "parentRef": "wall", "slot": "logos",
+        "inputs": { "image": { "target_id": 15 }, "name": "ESP Group", "link": "/work/journeycall-esp-group-rail-delay-repay-native-drupal-crm" } },
+
+      { "machine": "footer", "ref": "ftr",
+        "inputs": {
+          "backgroundColor": "#1d2d39",
+          "textColor": "Light",
+          "text": "©  2026 FreelyGive Ltd",
+          "heading": "Happy to help",
+          "phone": "+44 2039207023",
+          "phoneHref": "tel:+442039207023",
+          "email": "hello@freelygive.io",
+          "emailHref": "mailto:hello@freelygive.io"
+        } },
+      { "machine": "image", "parentRef": "ftr", "slot": "logo", "inputs": { "image": { "target_id": 16 } } },
+      { "machine": "brand_image", "parentRef": "ftr", "slot": "socialLinks",
+        "inputs": { "image": { "target_id": 17 }, "name": "YouTube", "link": "https://www.youtube.com/@FreelyGive", "openInNewTab": true } },
+      { "machine": "brand_image", "parentRef": "ftr", "slot": "socialLinks",
+        "inputs": { "image": { "target_id": 18 }, "name": "Twitter", "link": "https://twitter.com/freelygiveltd", "openInNewTab": true } },
+      { "machine": "brand_image", "parentRef": "ftr", "slot": "badges",
+        "inputs": { "image": { "target_id": 19 }, "name": "Cyber Essentials Certified", "link": "https://registry.blockmarktech.com/certificates/f64a0e05-153d-435c-92e4-13122c1b6f8b/?source=WEB", "openInNewTab": true } },
+      { "machine": "brand_image", "parentRef": "ftr", "slot": "badges",
+        "inputs": { "image": { "target_id": 20 }, "name": "Drupal Association Organization Member", "link": "https://www.drupal.org/freelygive", "openInNewTab": true } },
+      { "machine": "brand_image", "parentRef": "ftr", "slot": "badges",
+        "inputs": { "image": { "target_id": 21 }, "name": "Acquia Partner Awards 2025", "link": "/blog/acquia-source-partner-of-the-year-2025" } }
+    ]
+  }
+]

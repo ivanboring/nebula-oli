@@ -1,0 +1,4 @@
+# The instrument (core/) and third-party sets (contrib/) are fetched by the
+# installer, composer-style - only custom/ is this project's own code.
+core/
+contrib/

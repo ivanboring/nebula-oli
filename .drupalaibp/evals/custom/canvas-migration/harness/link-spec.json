@@ -1,0 +1,35 @@
+{
+  "version": "1.2-scope-aware-2026-08-11",
+  "provenance": "All facts extracted from the frozen source snapshot (sha bb4800b2..., reset harness 2026-07-17). Nav pairs each appear 3x on source (desktop/mobile/footer); source has ZERO href='#' anchors; the Twitter handle is freelygiveltd (run-3 invented freelygive); source has exactly 3 /work/<slug> tile anchors plus 2 bare /work links. v1.1 after the codex+opus review: pair matching is origin-constrained regex, social handles are exact-path regexes, tiles require /work/<slug>, only visible anchors count. v1.2 (2026-08-11): scope-awareness. The migration builds the HOMEPAGE ONLY, so nav links to other pages (/about, /crm, /jobs, ...) and work-tile links to /work/<slug> detail pages point OUT OF SCOPE - those pages were never built, so an unresolved or dead link there is honest, not a defect. Those assertions are therefore ADVISORY: they still report whether the source's link structure was carried (a parity signal for a future full-site migration), but they never fail the run. Only in-scope, scope-independent link facts hard-fail: the homepage's own external/social links (cm33), which exist regardless of what else is migrated.",
+  "cases": {
+    "nav_link_integrity": {
+      "origin_pattern": "https?://(www\\.)?freelygive\\.io",
+      "advisory_expected_pairs": [
+        ["About us", "/about"],
+        ["Subscriptions", "/subscriptions"],
+        ["Our CRM", "/crm"],
+        ["Jobs", "/jobs"],
+        ["Contact us", "/contact-us"],
+        ["Blog", "/blog"],
+        ["Services", "/services"],
+        ["AI", "/artificial-intelligence"]
+      ],
+      "advisory_forbid_hash_anchors": true
+    },
+    "social_links_exact": {
+      "required_href_regexes": [
+        "^https?://(www\\.)?twitter\\.com/freelygiveltd/?([?#].*)?$",
+        "^https?://(www\\.)?youtube\\.com/@FreelyGive/?([?#].*)?$"
+      ],
+      "forbidden_href_regexes": [
+        "twitter\\.com/freelygive(?!ltd)"
+      ]
+    },
+    "work_tiles_linked": {
+      "advisory_min_count_regex": {
+        "regex": "^(https?://(www\\.)?freelygive\\.io)?/work/.+",
+        "min": 3
+      }
+    }
+  }
+}
