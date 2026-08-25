@@ -1,0 +1,138 @@
+{
+  "version": "1.1-snapshot-verified-2026-07-17",
+  "calibrated_from": "https://freelygive.io live at 1440x900 (agent-browser computed geometry, 2026-07-15). RECALIBRATE against the archived file:// source snapshot when the WS2 reset harness creates it, and bump this version - the spec is a versioned score input like the noise allowlist and the tsc baseline.",
+  "viewport": {
+    "width": 1440,
+    "height": 900
+  },
+  "assertions": {
+    "container_max_width": {
+      "landmark": "Our CRM Solutions",
+      "expect_px": 1280,
+      "tolerance_px": 60,
+      "source_fact": "content column is 1280px at x=73 on the 1440 viewport (heading block width; all content sections share it)"
+    },
+    "video_stagger": {
+      "min_count": 3,
+      "min_y_spread_px": 40,
+      "source_fact": "3 YouTube embeds at page-y 647/724/801 (spread 154px, ~77px step); an evenly-aligned row has spread ~0"
+    },
+    "crm_two_col": {
+      "landmark": "Our CRM Solutions",
+      "expect_columns": 2,
+      "source_fact": "2 purple-circle product images in one row at x=180 and x=664 (phone mock 473px, laptop mock 581px)"
+    },
+    "underline_accent": {
+      "landmarks": [
+        "Prompt Engineering Tips",
+        "AI module to power websites for Starshot"
+      ],
+      "accept_mechanisms": [
+        "adjacent-shape",
+        "border-bottom",
+        "background-image"
+      ],
+      "source_fact": "video captions carry a brush-stroke underline SVG (Squarespace sqsrte-text-highlight; e.g. 224px-wide path at the Prompt Engineering Tips baseline). accept_mechanisms deliberately EXCLUDES plain text-decoration: the run-1 build underlines these captions as default links and the expert verdict (finding 4) is that this does not reproduce the accent - a faithful accent is a decorative shape, border, or background, not the browser's link underline."
+    },
+    "section_dividers": {
+      "min_count": 2,
+      "source_fact": "2 full-width clip-path section-boundary shapes (.section-border with url(#section-divider-...) at page-y 0 and 2246) - the curved band edges between background colors"
+    },
+    "mobile_no_overflow": {
+      "type": "horizontal_overflow",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "max_slack_px": 2,
+      "min_page_height_px": 2000,
+      "source_fact": "source scrollWidth 375 at the 390 viewport (no horizontal scroll); run-0 build scrolls to 399px - the video block (w-full inside mx-6) paints a white stripe down the whole site"
+    },
+    "mobile_header_row": {
+      "type": "header_row",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "logo_hint": "logo|freelygive",
+      "source_fact": "logo img left at x=23 y=24 (w=183), burger button right at x=305 y=23 - one row; run-0 build centers the logo (x=88, center 172 of 390) and drops the burger to y=68 below it"
+    },
+    "mobile_hero_text_style": {
+      "type": "text_style",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "landmark": "Full Stack CRM with AI solutions",
+      "expect_font_weight": "400",
+      "expect_line_height_ratio": 1.0,
+      "ratio_tolerance": 0.15,
+      "source_fact": "hero heading at 390w: weight 400, line-height 26.6px = font-size 26.6px (ratio 1.0), futura-pt; run-0 build: weight 700, line-height normal (~1.2), Inter 36px. Family/size stay advisory facts - weight and leading gate"
+    },
+    "footer_accent_color": {
+      "type": "text_color",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "landmark": "Happy to help",
+      "expect_color": "rgb(242, 203, 7)",
+      "source_fact": "footer 'Happy to help' is the brand yellow rgb(242,203,7); run-0 build renders it white"
+    },
+    "mobile_cards_row_pattern": {
+      "type": "row_pattern",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "landmarks": [
+        "AI",
+        "Talks",
+        "Work"
+      ],
+      "expect_rows": [
+        2,
+        1
+      ],
+      "row_gap_px": 60,
+      "source_fact": "AI (x=89) + Talks (x=242) share a row at y=3328, Work centered below at y=3468 - the mobile 2+1 pattern; run-0 build stacks all three [1,1,1]"
+    },
+    "mobile_clients_grid": {
+      "type": "image_grid",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "landmark": "Our Clients",
+      "expect_rows": [
+        2,
+        2,
+        1
+      ],
+      "expect_min_img_w": 100,
+      "row_gap_px": 40,
+      "window_px": 500,
+      "source_fact": "client logos at 390w: rows of 2 (y=3665), 2 (y=3770), 1 centered (y=3875), widths 116-243px; run-0 build stacks them single-column at 96px (pattern miss AND smaller logos)"
+    },
+    "footer_copyright_last": {
+      "type": "order_last",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "landmark": "\u00a9",
+      "bottom_window_px": 300,
+      "source_fact": "copyright is the page's last block (y=4780 of 4834), below all contact and social links; run-0 build parks it mid-footer right under the logo (y=5250 of 5794, above contact and social)"
+    },
+    "footer_social_beside_contact": {
+      "type": "side_by_side",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "band_px": 300,
+      "source_fact": "social icons (x=235-242) sit right of the contact details (right edge 192) in the same y-band; run-0 build stacks them below at x=24"
+    }
+  },
+  "provenance": "Values calibrated live on freelygive.io 2026-07-15/17 (was: 1.0-live-calibration-2026-07-15). 2026-07-17: all 13 assertions verified PASS unchanged against the frozen source snapshot created by harness/reset.sh (source-snapshot/index.html), so the frozen capture is the reference for graded runs; recalibrate and bump this version whenever the snapshot is recaptured or the site pack changes."
+}

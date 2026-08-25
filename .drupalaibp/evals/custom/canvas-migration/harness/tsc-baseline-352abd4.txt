@@ -1,0 +1,5 @@
+# Pristine typecheck failing-file set for kit rev 352abd4 (2026-08-10).
+# EMPTY on purpose: the TS-migrated kit typechecks clean (npx tsc --noEmit
+# exits 0 on the pristine fg-canvas-eval2 bed), so ANY failing file after a
+# migration run is agent-introduced. Picked automatically by
+# run.py:load_bed_profile when state.json's pristine_kit_rev matches.
