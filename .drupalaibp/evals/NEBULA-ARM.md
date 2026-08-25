@@ -71,6 +71,26 @@ agent's config home, and then **stops** with the two pending items:
 state, no AI, no cost. On a freshly armed bed that is a RUN INVALID board
 (nothing migrated yet) - the free way to prove the plumbing before paying.
 
+### A manual episode (run it yourself, then grade)
+
+Grade-only also scores a migration you drive interactively. Do it on the
+isolated config home, not on `ddev claude`: the installer mirrors your
+host `~/.claude` (skills, hooks, agents, history) into the container home,
+and a migration made with the operator's toolbox loaded is not a
+measurement of the kit.
+
+```bash
+ddev claude-isolated     # same launch as the harness: project skills only
+ddev eval grade          # afterwards, from the bed root
+```
+
+Give the agent the harness's task text (`harness/agentic-run.sh`, the
+`workbench` kit branch) for a comparable episode. The board is grade-only:
+no cost or time line (those come from the harness's `-p` envelope) and the
+delta oracle uses the frozen baseline count, not a pre-agent snapshot. A
+manual episode does not mark the bed consumed, so never follow it with a
+harness run on the same bed: the harness would grade your work as its own.
+
 ## The paid run
 
 ```bash
