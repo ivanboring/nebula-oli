@@ -17,7 +17,7 @@ non-Drupal (`is_drupal: false`) setup.
 
 ```bash
 bash <(curl -fsSL https://project.pages.drupalcode.org/one_line_installer/drupalaibp) \
-  <URL-of-this-repository> --config nebula
+  https://github.com/ivanboring/nebula-oli --config nebula
 ```
 
 Options:
