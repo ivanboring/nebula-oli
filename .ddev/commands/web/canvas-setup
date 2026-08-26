@@ -363,7 +363,7 @@ if ($shouldArm) {
             'scaffold_commit' => $revision,
             'bed_shape' => 'ddev',
             'reset_note' => $resetNote,
-            'reset_at' => date('Ymd-His'),
+            'reset_at' => gmdate('Y-m-d\TH:i:s\Z'),
         ];
         file_put_contents(
             $statePath,
