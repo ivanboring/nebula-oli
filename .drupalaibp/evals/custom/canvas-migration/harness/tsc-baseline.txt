@@ -1,0 +1,15 @@
+# EXACT file paths that fail tsc on a PRISTINE starter kit install
+# (canvas-storybook-ai @ ef985b66 / DDEV-Canvas v1.0.12). Exact matches
+# only - directory prefixes were removed after adversarial review because
+# they whitelisted agent-created files inside baselined dirs.
+# REGENERATED 2026-07-17 by the WS2 reset harness from a freshly reset
+# workspace (installer artifacts @ ef985b6), as this file's first draft
+# instructed: the hand-recorded run-0 list had missed
+# breadcrumb.stories.tsx. reset.sh phase 4 re-derives and diffs this set
+# on every reset; drift is a warning, updates stay deliberate commits.
+.storybook/main.ts
+.storybook/preview.tsx
+src/components/accordion/index.jsx
+src/components/brand_carousel/index.jsx
+src/stories/components/brand_detail.stories.tsx
+src/stories/components/breadcrumb.stories.tsx
