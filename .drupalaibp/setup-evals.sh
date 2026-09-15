@@ -130,7 +130,11 @@ if [ "$overlay" = true ]; then
   note "overlaying custom/canvas-migration onto the instrument's sample set"
   cp -f "$EVALS/custom/canvas-migration/dataset.yaml" "$SET_DIR/dataset.yaml"
   cp -f "$EVALS"/custom/canvas-migration/harness/* "$SET_DIR/harness/"
-  cp -f "$EVALS"/custom/canvas-migration/checks/* "$SET_DIR/checks/"
+  # custom/ ships no checks of its own: a custom check must not reuse a name
+  # the instrument ships, because this copy would replace it.
+  if compgen -G "$EVALS/custom/canvas-migration/checks/*" > /dev/null; then
+    cp -f "$EVALS"/custom/canvas-migration/checks/* "$SET_DIR/checks/"
+  fi
 fi
 
 # --- 3. geom-probe deps + referee image ----------------------------------------

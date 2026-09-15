@@ -4,11 +4,13 @@ The canvas-migration eval harness on the Nebula kit, laid out the Drupal way:
 
 - **`custom/`** - this project's eval set, committed here. Ships
   `canvas-migration/`: the freelygive.io homepage migration set (dataset,
-  calibrated fixtures, site-specific checks). It is the **same set** the
+  calibrated fixtures, harness specs). It is the **same set** the
   [canvas-storybook-ai](https://gitlab.com/freelygive/canvas-storybook-ai)
   kit vendors under its `.drupalaibp/evals/custom/` - copied, not forked,
   so the two kits grade identical cases. When one side recalibrates, copy
-  the set across; never edit it here alone.
+  the set across; never edit it here alone. A check added here must not
+  reuse a name the instrument ships: the installer copies `custom/` over
+  `core/`, so a same-named file silently replaces the core one.
 - **`core/`** - the instrument itself (runner, rubric catalogue, generic
   checks, geom-probe, the referee container). Gitignored: fetched by the
   installer from its canonical home, the `drupal/ai_best_practices`
