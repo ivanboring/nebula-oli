@@ -113,3 +113,31 @@ overlay makes pinned boards report `dirty=true` - the manifest says so.
 
 Every scoreboard records which instrument revision graded it (`abp_git_sha`
 plus a dirty flag in the run manifest).
+
+## Update
+
+The instrument moves with the pin, never by hand:
+
+```bash
+ddev eval-update --status            # pin, fetched revision, channel, service image
+ddev eval-update --dev <sha|branch>  # try a revision: fetched beside core/ as core-dev/,
+                                     # boards labelled channel=dev-fetched, core.pin untouched
+ddev eval-update <sha|branch>        # promote to the stable pin - only a revision the
+                                     # instrument's equivalence gate vouches for is
+                                     # accepted; otherwise exit 3
+ddev eval-update                     # back to the stable pin (dev boards carried into core/runs)
+```
+
+A pin is accepted in three ways. The first is the exact sha that graded this
+kit's reference beds. The second is a descendant of that sha whose grader files
+did not change. The third is any commit whose grader files have the same content
+digest as a graded one, which is what survives a squash merge. Run
+`ddev eval-update --dry-run <sha>` and it prints which of the three applied.
+
+Refs resolve once, from the pin's origin only, to a full sha. `--dry-run`
+resolves and checks without changing anything. The command is the instrument's
+own `abp-eval update` (`harness/update.py`); this project's
+`.ddev/commands/host/eval-update` only finds a front door and runs it, and the
+instrument calls `setup-evals.sh` back for the fetch, image, compose and
+restart. A pinned instrument older than `update` cannot run it: bump `core.pin`
+once by hand and run `setup-evals.sh`.
