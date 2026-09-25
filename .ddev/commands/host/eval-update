@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ## Description: Move this project's eval instrument to another revision (stable pin or dev channel) - runs the instrument's own `abp-eval update`
-## Usage: eval-update [--status | --dry-run] [<sha|ref> | --dev <sha|ref> | --stable]
-## Example: "ddev eval-update --status"
+## Usage: eval-update [--status | --dry-run] [<branch|tag|full-commit-id> | --dev <branch|tag|full-commit-id> | --stable]
+## Example: "ddev eval-update --dev <branch>" (try a branch; the pin stays), "ddev eval-update --status"
 
 # Host-side, path resolution only: the decision (which revisions may become
 # the stable pin, how refs resolve, the dev channel) lives in the instrument
