@@ -49,6 +49,20 @@ EVALS="$PROJECT/.drupalaibp/evals"
 CORE="$EVALS/core"
 PIN_FILE="$EVALS/core.pin"
 MARKER=".abp-fetched"
+# Provenance channel, recorded on every board the service grades (the
+# instrument reads ABP_CHANNEL from the compose environment):
+#   stable       core/ at the core.pin rev (the only channel ddev eval-update
+#                promotes to, and only for fixture-backed revisions)
+#   dev-fetched  core-dev/ at ABP_DEV_REV, fetched from the pin's origin
+#                by `ddev eval-update --dev <ref>`; core.pin untouched
+#   dev-worktree ABP_CORE_DIR, a checkout in place
+CHANNEL="stable"
+if [ -n "${ABP_DEV_REV:-}" ]; then
+  printf '%s' "$ABP_DEV_REV" | grep -qE '^[0-9a-f]{40}$' \
+    || { echo "  [evals] ABP_DEV_REV must be a full 40-char commit sha (ddev eval-update resolves refs)" >&2; exit 1; }
+  CHANNEL="dev-fetched"
+  CORE="$EVALS/core-dev"
+fi
 LOG="$EVALS/setup-evals.log"
 
 note() { printf '  [evals] %s\n' "$*"; }
@@ -62,6 +76,9 @@ fetch_pin() {
   local url rev got
   url="$(sed -n 1p "$PIN_FILE")"; rev="$(sed -n 2p "$PIN_FILE")"
   [ -n "$url" ] && [ -n "$rev" ] || { note "core.pin is malformed (need URL line 1, rev line 2)"; exit 1; }
+  # The dev channel fetches a different rev from the SAME origin - never
+  # another repository: fetched code grades with this bed's authority.
+  [ -n "${ABP_DEV_REV:-}" ] && rev="$ABP_DEV_REV"
   # The pin is a FULL 40-hex commit sha: immutable, exact-comparable. Tags
   # and branches move; abbreviations would refetch forever on reuse checks.
   printf '%s' "$rev" | grep -qE '^[0-9a-f]{40}$' \
@@ -73,6 +90,12 @@ fetch_pin() {
   got="$(git -C "$TMP_FETCH/core" rev-parse HEAD)"
   [ "$got" = "$rev" ] || { note "FAIL: checked-out rev $got does not match pin $rev"; exit 1; }
   : > "$TMP_FETCH/core/$MARKER"
+  if [ -n "${ABP_DEV_REV:-}" ]; then
+    # Written before anything from the fetched tree runs: requested ref and
+    # the sha it resolved to, so a dev board can always be traced.
+    printf 'channel=dev-fetched\nrequested=%s\nresolved=%s\nfetched_at=%s\n' \
+      "${ABP_DEV_REF:-$ABP_DEV_REV}" "$rev" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$TMP_FETCH/core/.abp-channel"
+  fi
   # No delete-first gap: the old core moves aside, the new one moves in,
   # and only then does the old one go away.
   if [ -d "$CORE" ]; then
@@ -101,6 +124,7 @@ overlay=true
 if [ -n "${ABP_CORE_DIR:-}" ]; then
   CORE="$(cd "$ABP_CORE_DIR" && pwd)"
   overlay=false
+  CHANNEL="dev-worktree"
   note "development mode: instrument = $CORE (ABP_CORE_DIR, not the pin)"
   note "note: development mode grades the checkout's own set, not custom/"
 elif [ -d "$CORE" ] && [ ! -f "$CORE/$MARKER" ]; then
@@ -108,10 +132,48 @@ elif [ -d "$CORE" ] && [ ! -f "$CORE/$MARKER" ]; then
   note "  use ABP_CORE_DIR=$CORE for a dev checkout, or remove core/ to refetch the pin"
   exit 1
 elif [ -f "$PIN_FILE" ]; then
-  want="$(sed -n 2p "$PIN_FILE")"
+  want="${ABP_DEV_REV:-$(sed -n 2p "$PIN_FILE")}"
+  # Leaving the dev channel: its boards are operator data too - carry them
+  # into the stable core (under runs/, same layout) before core-dev/ goes.
+  if [ -z "${ABP_DEV_REV:-}" ] && [ -d "$EVALS/core-dev" ]; then
+    DEV_RUNS="$EVALS/core-dev/evals/canvas-migration/runs"
+    if [ -d "$DEV_RUNS" ]; then
+      # core/ may not exist yet (dev channel entered on a fresh bed): create
+      # it as ours, so the refetch below adopts it instead of refusing an
+      # unmarked directory.
+      [ -d "$CORE" ] || { mkdir -p "$CORE"; : > "$CORE/$MARKER"; }
+      mkdir -p "$CORE/evals/canvas-migration/runs"
+      dev_rev="$(git -C "$EVALS/core-dev" rev-parse --short=12 HEAD 2>/dev/null || echo unknown)"
+      moved=0
+      for d in "$DEV_RUNS"/*; do
+        [ -e "$d" ] || continue
+        dest="$CORE/evals/canvas-migration/runs/$(basename "$d")"
+        # A board of the same id already in core/ is never overwritten and
+        # never dropped: the dev copy lands under a distinct name.
+        [ -e "$dest" ] && dest="$dest-dev-$dev_rev"
+        mv "$d" "$dest" && moved=$((moved+1))
+      done
+      [ "$moved" -gt 0 ] && note "carried $moved dev-channel board(s) into core/ (their manifests say channel=dev-fetched)"
+      # Remove core-dev/ only once nothing is left to carry; otherwise keep
+      # it and say so (spec: an update never deletes run boards).
+      if [ -n "$(ls -A "$DEV_RUNS" 2>/dev/null)" ]; then
+        note "FAIL: boards remain in core-dev/ after the carry - core-dev/ kept, nothing deleted; move them by hand and re-run"
+        exit 1
+      fi
+    fi
+    rm -rf "$EVALS/core-dev"
+    note "left the dev channel: core-dev/ removed, back on the stable pin"
+  fi
   if [ -d "$CORE/.git" ] \
      && [ "$(git -C "$CORE" rev-parse HEAD 2>/dev/null)" = "$want" ]; then
     note "instrument already at the pinned rev ${want:0:12}, keeping it"
+    if [ -n "${ABP_DEV_REV:-}" ]; then
+      # Same sha reached through a possibly different ref: the provenance
+      # marker records THIS activation, before anything from the tree runs.
+      printf 'channel=dev-fetched\nrequested=%s\nresolved=%s\nfetched_at=%s\n' \
+        "${ABP_DEV_REF:-$ABP_DEV_REV}" "$want" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$CORE/.abp-channel.tmp" \
+        && mv -f "$CORE/.abp-channel.tmp" "$CORE/.abp-channel"
+    fi
   else
     [ -d "$CORE" ] && note "existing fetch does not match the pin - refetching"
     fetch_pin
@@ -130,7 +192,11 @@ if [ "$overlay" = true ]; then
   note "overlaying custom/canvas-migration onto the instrument's sample set"
   cp -f "$EVALS/custom/canvas-migration/dataset.yaml" "$SET_DIR/dataset.yaml"
   cp -f "$EVALS"/custom/canvas-migration/harness/* "$SET_DIR/harness/"
-  cp -f "$EVALS"/custom/canvas-migration/checks/* "$SET_DIR/checks/"
+  # custom/ ships no checks of its own: a custom check must not reuse a name
+  # the instrument ships, because this copy would replace it.
+  if compgen -G "$EVALS/custom/canvas-migration/checks/*" > /dev/null; then
+    cp -f "$EVALS"/custom/canvas-migration/checks/* "$SET_DIR/checks/"
+  fi
 fi
 
 # --- 3. geom-probe deps + referee image ----------------------------------------
@@ -257,6 +323,13 @@ if $ok_image; then
       "$PROJECT"/*) ;;
       *) extra_mount="      - $CORE:$CORE:ro"$'\n' ;;
     esac
+    # Browsers normalize URL hosts to lowercase, but Docker link aliases
+    # preserve case. Keep the original aliases for CLI clients as well.
+    dns_name="$(printf '%s' "$NAME" | tr '[:upper:]' '[:lower:]')"
+    lowercase_router_links=""
+    if [ "$dns_name" != "$NAME" ]; then
+      lowercase_router_links="      - \"ddev-router:${dns_name}.ddev.site\""$'\n'
+    fi
     TMP_COMPOSE="$(mktemp)"
     cat > "$TMP_COMPOSE" <<EOF
 # GENERATED by .drupalaibp/setup-evals.sh - machine-specific, gitignored.
@@ -287,7 +360,7 @@ ${socket_groups}    cap_drop:
       - ddev_default
     external_links:
       - "ddev-router:${NAME}.ddev.site"
-    working_dir: ${SET_DIR}
+${lowercase_router_links}    working_dir: ${SET_DIR}
     # ddev eval web (the scoreboard viewer) through the ddev router:
     # VIRTUAL_HOST + *_EXPOSE are ddev's documented seam for exposing a
     # custom service's port - https://${NAME}.ddev.site:8899.
@@ -304,6 +377,7 @@ ${socket_groups}    cap_drop:
       - TZ=${TZ_NAME:-UTC}
       - ABP_PROJECT_DIR=${PROJECT}
       - ABP_EVAL_DIR=${SET_DIR}
+      - ABP_CHANNEL=${CHANNEL}
     volumes:
       - ${docker_socket}:/var/run/docker.sock:ro
       # ddev execs service commands at /mnt/ddev_config/commands/<service>/
@@ -375,7 +449,8 @@ fi
 ABP_SOURCE_SITE="${ABP_SOURCE_SITE:-https://freelygive.io/}"
 
 # --- 5. accurate summary --------------------------------------------------------
-note "instrument ready at $CORE"
+note "instrument ready at $CORE (channel: $CHANNEL)"
+[ "$CHANNEL" = "dev-fetched" ] && note "DEV CHANNEL: every board from this bed is labelled dev-fetched until 'ddev eval-update' returns it to the stable pin"
 $ok_image || note "NO referee image - ddev eval cannot run without it (see log above)"
 $ok_compose && note "eval service ready: ddev eval runs in-container (host needs only docker + ddev)" \
             || note "NO eval service - fix the notes above, then re-run this script"

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+## Description: Move this project's eval instrument to another revision (stable pin or dev channel) - runs the instrument's own `abp-eval update`
+## Usage: eval-update [--status | --dry-run] [<branch|tag|full-commit-id> | --dev <branch|tag|full-commit-id> | --stable]
+## Example: "ddev eval-update --dev <branch>" (try a branch; the pin stays), "ddev eval-update --status"
+
+# Host-side, path resolution only: the decision (which revisions may become
+# the stable pin, how refs resolve, the dev channel) lives in the instrument
+# (harness/update.py, `abp-eval update`), and the machine-specific work
+# (fetch, referee image, compose, restart) in .drupalaibp/setup-evals.sh,
+# which the instrument calls back. This file just finds a front door.
+#
+# Bootstrap: a pinned instrument that predates `update` cannot run it. Then
+# the one-time path is the installer itself - edit core.pin to a revision
+# that ships update (or newer) and run setup-evals.sh once; every later move
+# goes through this command.
+set -euo pipefail
+
+PROJECT="$DDEV_APPROOT"
+EVALS="$PROJECT/.drupalaibp/evals"
+export ABP_PROJECT_DIR="$PROJECT"
+
+# Prefer the stable core's front door; an active dev core is a candidate,
+# not the authority. ABP_CORE_DIR (development in place) wins when set.
+for core in "${ABP_CORE_DIR:-}" "$EVALS/core" "$EVALS/core-dev"; do
+  [ -n "$core" ] || continue
+  front="$core/evals/canvas-migration/abp-eval"
+  if [ -x "$front" ] && [ -f "$core/evals/canvas-migration/harness/update.py" ]; then
+    exec "$front" update "$@"
+  fi
+done
+
+echo "eval-update: no installed instrument ships 'abp-eval update' yet" >&2
+if [ -f "$EVALS/core.pin" ]; then
+  echo "  pinned: $(sed -n 2p "$EVALS/core.pin")" >&2
+fi
+echo "  one-time bootstrap: set core.pin (line 2) to a revision that ships update, then" >&2
+echo "    bash .drupalaibp/setup-evals.sh" >&2
+echo "  after that, this command drives every move (see .drupalaibp/evals/README.md, Update)" >&2
+exit 1
